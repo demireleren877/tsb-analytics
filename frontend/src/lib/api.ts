@@ -9,6 +9,7 @@ import type {
   GrowthData,
   ComparisonData,
   YoYComparison,
+  CompanyPerformanceData,
 } from '../types';
 
 const API_BASE_URL = 'https://tsb-analytics-api.l5819033.workers.dev';
@@ -118,6 +119,20 @@ export const getGrowth = async (
   if (branch) params.append('branch', branch);
 
   const response = await api.get(`/api/analytics/growth?${params.toString()}`);
+  return response.data.data;
+};
+
+export const getCompanyPerformance = async (
+  company: number,
+  periods: number = 8,
+  branch?: string
+): Promise<CompanyPerformanceData[]> => {
+  const params = new URLSearchParams();
+  params.append('company', company.toString());
+  params.append('periods', periods.toString());
+  if (branch) params.append('branch', branch);
+
+  const response = await api.get(`/api/analytics/company-performance?${params.toString()}`);
   return response.data.data;
 };
 

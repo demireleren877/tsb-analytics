@@ -15,7 +15,7 @@ import {
 import { ArrowLeft, TrendingUp, TrendingDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
-import { getCompany, getTrends, getGrowth, getBranches } from '../lib/api';
+import { getCompany, getGrowth, getBranches, getCompanyPerformance } from '../lib/api';
 import { formatCurrency, formatPercent, formatPeriod } from '../lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/Card';
 import { MetricCard } from '../components/MetricCard';
@@ -36,34 +36,10 @@ export function CompanyDetail() {
     queryFn: getBranches,
   });
 
-  // Get trends for different metrics
-  const { data: premiumTrends } = useQuery({
-    queryKey: ['trends', companyId, 'net_premium', selectedBranch],
-    queryFn: () => getTrends(companyId, 'net_premium', 8, selectedBranch || undefined),
-    enabled: !!companyId,
-  });
-
-  const { data: paymentTrends } = useQuery({
-    queryKey: ['trends', companyId, 'net_payment', selectedBranch],
-    queryFn: () => getTrends(companyId, 'net_payment', 8, selectedBranch || undefined),
-    enabled: !!companyId,
-  });
-
-  const { data: unreportedTrends } = useQuery({
-    queryKey: ['trends', companyId, 'net_unreported', selectedBranch],
-    queryFn: () => getTrends(companyId, 'net_unreported', 8, selectedBranch || undefined),
-    enabled: !!companyId,
-  });
-
-  const { data: earnedTrends } = useQuery({
-    queryKey: ['trends', companyId, 'net_earned_premium', selectedBranch],
-    queryFn: () => getTrends(companyId, 'net_earned_premium', 8, selectedBranch || undefined),
-    enabled: !!companyId,
-  });
-
-  const { data: incurredTrends } = useQuery({
-    queryKey: ['trends', companyId, 'net_incurred', selectedBranch],
-    queryFn: () => getTrends(companyId, 'net_incurred', 8, selectedBranch || undefined),
+  // Get performance data with PYE
+  const { data: performanceData } = useQuery({
+    queryKey: ['performance', companyId, selectedBranch],
+    queryFn: () => getCompanyPerformance(companyId, 8, selectedBranch || undefined),
     enabled: !!companyId,
   });
 
@@ -75,17 +51,17 @@ export function CompanyDetail() {
 
   if (companyLoading) return <Loading />;
 
-  // Combine all metrics by period
-  const quarterlyData = premiumTrends?.map((item, index) => {
-    // Calculate Net Ultimate for this period
-    // Note: We don't have PYE data in trends, so this is a simplified calculation
-    const netPayment = Math.abs(paymentTrends?.[index]?.value || 0);
-    const netIncurred = Math.abs(incurredTrends?.[index]?.value || 0);
-    const netUnreported = Math.abs(unreportedTrends?.[index]?.value || 0);
-    const netEP = earnedTrends?.[index]?.value || 0;
+  // Transform performance data for charts
+  const quarterlyData = performanceData?.map((item) => {
+    const netPayment = Math.abs(item.net_payment);
+    const netIncurred = Math.abs(item.net_incurred);
+    const netUnreported = Math.abs(item.net_unreported);
+    const netEP = item.net_earned_premium;
+    const pyeNetIncurred = Math.abs(item.pye_net_incurred);
+    const pyeNetUnreported = Math.abs(item.pye_net_unreported);
 
-    // Simplified Net Ultimate (without PYE delta since we don't have historical data in trends)
-    const netUltimate = netPayment + netIncurred + netUnreported;
+    // Correct Net Ultimate calculation with PYE delta
+    const netUltimate = netPayment + netIncurred + netUnreported - pyeNetIncurred - pyeNetUnreported;
     const lossRatio = netEP > 0 ? (netUltimate / netEP) * 100 : 0;
 
     return {
@@ -116,7 +92,7 @@ export function CompanyDetail() {
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-4">
-            <label className="text-sm font-medium">Branş:</label>
+            <label className="text-sm font-medium">Hazine Kodu:</label>
             <select
               value={selectedBranch}
               onChange={(e) => setSelectedBranch(e.target.value)}
@@ -125,7 +101,7 @@ export function CompanyDetail() {
               <option value="">Tüm Branşlar</option>
               {branches?.map((branch) => (
                 <option key={branch.code} value={branch.code}>
-                  {branch.name}
+                  {branch.code} - {branch.name}
                 </option>
               ))}
             </select>

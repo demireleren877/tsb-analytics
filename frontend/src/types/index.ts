@@ -121,3 +121,14 @@ export interface YoYComparison {
     net_earned_premium: number;
   };
 }
+
+export interface CompanyPerformanceData {
+  period: string;
+  net_premium: number;
+  net_payment: number;
+  net_incurred: number;
+  net_unreported: number;
+  net_earned_premium: number;
+  pye_net_incurred: number;
+  pye_net_unreported: number;
+}

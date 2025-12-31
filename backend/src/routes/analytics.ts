@@ -262,6 +262,112 @@ analytics.get('/growth', async (c) => {
   }
 });
 
+// GET /api/analytics/company-performance - Şirket performans verileri (PYE dahil)
+analytics.get('/company-performance', async (c) => {
+  try {
+    const { company, periods = '8', branch } = c.req.query();
+
+    if (!company) {
+      return c.json({
+        success: false,
+        error: 'Company ID is required',
+      }, 400);
+    }
+
+    // Get all periods for this company
+    let periodsQuery = `
+      SELECT DISTINCT period
+      FROM financial_data
+      WHERE company_id = ?
+    `;
+    const periodsParams: any[] = [company];
+
+    if (branch) {
+      periodsQuery += ' AND branch_code = ?';
+      periodsParams.push(branch);
+    }
+
+    periodsQuery += ' ORDER BY period DESC LIMIT ?';
+    periodsParams.push(parseInt(periods));
+
+    const periodsResult = await c.env.DB.prepare(periodsQuery).bind(...periodsParams).all();
+
+    if (!periodsResult.results || periodsResult.results.length === 0) {
+      return c.json({
+        success: true,
+        data: [],
+      });
+    }
+
+    // For each period, get the data and calculate PYE
+    const performanceData = [];
+
+    for (const periodRow of periodsResult.results) {
+      const currentPeriod = periodRow.period as string;
+      const year = parseInt(currentPeriod.substring(0, 4));
+      const pyePeriod = `${year - 1}4`; // Previous year Q4
+
+      // Get current period data
+      let currentQuery = `
+        SELECT
+          SUM(net_premium) as net_premium,
+          SUM(net_payment) as net_payment,
+          SUM(net_incurred) as net_incurred,
+          SUM(net_unreported) as net_unreported,
+          SUM(net_earned_premium) as net_earned_premium
+        FROM financial_data
+        WHERE company_id = ? AND period = ?
+      `;
+      const currentParams: any[] = [company, currentPeriod];
+
+      if (branch) {
+        currentQuery += ' AND branch_code = ?';
+        currentParams.push(branch);
+      }
+
+      const currentData = await c.env.DB.prepare(currentQuery).bind(...currentParams).first();
+
+      // Get PYE data
+      let pyeQuery = `
+        SELECT
+          SUM(net_incurred) as pye_net_incurred,
+          SUM(net_unreported) as pye_net_unreported
+        FROM financial_data
+        WHERE company_id = ? AND period = ?
+      `;
+      const pyeParams: any[] = [company, pyePeriod];
+
+      if (branch) {
+        pyeQuery += ' AND branch_code = ?';
+        pyeParams.push(branch);
+      }
+
+      const pyeData = await c.env.DB.prepare(pyeQuery).bind(...pyeParams).first();
+
+      performanceData.push({
+        period: currentPeriod,
+        net_premium: currentData?.net_premium || 0,
+        net_payment: currentData?.net_payment || 0,
+        net_incurred: currentData?.net_incurred || 0,
+        net_unreported: currentData?.net_unreported || 0,
+        net_earned_premium: currentData?.net_earned_premium || 0,
+        pye_net_incurred: pyeData?.pye_net_incurred || 0,
+        pye_net_unreported: pyeData?.pye_net_unreported || 0,
+      });
+    }
+
+    return c.json({
+      success: true,
+      data: performanceData.reverse(), // Return in chronological order
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message,
+    }, 500);
+  }
+});
+
 // GET /api/analytics/loss-ratio-rankings - Loss Ratio bazlı performans sıralaması
 analytics.get('/loss-ratio-rankings', async (c) => {
   try {
