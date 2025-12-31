@@ -29,20 +29,22 @@ export function formatPeriod(period: string): string {
   return `${year} Q${quarter}`;
 }
 
-// Calculate Net Ultimate (Net Ödeme + Delta Net Muallak + Delta Net Raporlanmayan)
-// This requires historical data, so we'll compute it when we have trend data
+// Calculate Net Ultimate
+// Formula: Net Ödeme + Net Tahakkuk + Net Raporlanmayan - PYE_Net Tahakkuk - PYE_Net Raporlanmayan
 export interface UltimateData {
   net_payment: number;
+  net_incurred: number;
   net_unreported: number;
-  net_unreported_prev?: number;
-  net_reported?: number;
-  net_reported_prev?: number;
+  pye_net_incurred: number;
+  pye_net_unreported: number;
 }
 
 export function calculateNetUltimate(data: UltimateData): number {
-  const deltaUnreported = data.net_unreported - (data.net_unreported_prev || 0);
-  const deltaReported = (data.net_reported || 0) - (data.net_reported_prev || 0);
-  return Math.abs(data.net_payment) + Math.abs(deltaUnreported) + Math.abs(deltaReported);
+  return Math.abs(data.net_payment)
+       + Math.abs(data.net_incurred)
+       + Math.abs(data.net_unreported)
+       - Math.abs(data.pye_net_incurred)
+       - Math.abs(data.pye_net_unreported);
 }
 
 export function calculateLossRatio(netUltimate: number, netEP: number): number {

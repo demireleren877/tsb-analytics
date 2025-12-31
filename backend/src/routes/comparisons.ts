@@ -20,8 +20,14 @@ comparisons.post('/companies', async (c) => {
     }
 
     const currentPeriod = period || '20253';
+
+    // Calculate previous year end (Q4 of previous year)
+    const year = parseInt(currentPeriod.substring(0, 4));
+    const pyePeriod = `${year - 1}4`;
+
     const placeholders = companyIds.map(() => '?').join(',');
 
+    // Get current period data
     let query = `
       SELECT
         c.id,
@@ -53,6 +59,39 @@ comparisons.post('/companies', async (c) => {
 
     const result = await c.env.DB.prepare(query).bind(...params).all();
 
+    // Get PYE (Previous Year End) data
+    let pyeQuery = `
+      SELECT
+        c.id,
+        fd.branch_code,
+        SUM(fd.net_incurred) as pye_net_incurred,
+        SUM(fd.net_unreported) as pye_net_unreported
+      FROM financial_data fd
+      JOIN companies c ON fd.company_id = c.id
+      WHERE fd.company_id IN (${placeholders})
+      AND fd.period = ?
+    `;
+    const pyeParams = [...companyIds, pyePeriod];
+
+    if (branch) {
+      pyeQuery += ' AND fd.branch_code = ?';
+      pyeParams.push(branch);
+    }
+
+    pyeQuery += ' GROUP BY c.id, fd.branch_code';
+
+    const pyeResult = await c.env.DB.prepare(pyeQuery).bind(...pyeParams).all();
+
+    // Create PYE lookup map
+    const pyeData: any = {};
+    pyeResult.results?.forEach((row: any) => {
+      const key = `${row.id}_${row.branch_code}`;
+      pyeData[key] = {
+        pye_net_incurred: row.pye_net_incurred || 0,
+        pye_net_unreported: row.pye_net_unreported || 0,
+      };
+    });
+
     // Group by company
     const companyData: any = {};
     result.results?.forEach((row: any) => {
@@ -69,9 +108,14 @@ comparisons.post('/companies', async (c) => {
             net_earned_premium: 0,
             net_incurred: 0,
             net_unreported: 0,
+            pye_net_incurred: 0,
+            pye_net_unreported: 0,
           },
         };
       }
+
+      const pyeKey = `${row.id}_${row.branch_code}`;
+      const pye = pyeData[pyeKey] || { pye_net_incurred: 0, pye_net_unreported: 0 };
 
       companyData[row.id].branches.push({
         code: row.branch_code,
@@ -82,6 +126,8 @@ comparisons.post('/companies', async (c) => {
         net_earned_premium: row.net_earned_premium,
         net_incurred: row.net_incurred,
         net_unreported: row.net_unreported,
+        pye_net_incurred: pye.pye_net_incurred,
+        pye_net_unreported: pye.pye_net_unreported,
       });
 
       // Add to totals
@@ -91,12 +137,15 @@ comparisons.post('/companies', async (c) => {
       companyData[row.id].totals.net_earned_premium += row.net_earned_premium || 0;
       companyData[row.id].totals.net_incurred += row.net_incurred || 0;
       companyData[row.id].totals.net_unreported += row.net_unreported || 0;
+      companyData[row.id].totals.pye_net_incurred += pye.pye_net_incurred || 0;
+      companyData[row.id].totals.pye_net_unreported += pye.pye_net_unreported || 0;
     });
 
     return c.json({
       success: true,
       data: Object.values(companyData),
       period: currentPeriod,
+      pyePeriod: pyePeriod,
     });
   } catch (error: any) {
     return c.json({

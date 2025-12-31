@@ -63,9 +63,14 @@ export function Compare() {
   };
 
   const chartData = comparison?.map((company) => {
-    // Calculate Net Ultimate: Net Ödeme + Net Muallak (unreported)
-    // For simplicity, using current period data as we don't have delta calculations
-    const netUltimate = Math.abs(company.totals.net_payment) + Math.abs(company.totals.net_unreported);
+    // Calculate Net Ultimate using correct formula:
+    // Net Ödeme + Net Tahakkuk + Net Raporlanmayan - PYE_Net Tahakkuk - PYE_Net Raporlanmayan
+    const netUltimate = Math.abs(company.totals.net_payment)
+                      + Math.abs(company.totals.net_incurred)
+                      + Math.abs(company.totals.net_unreported)
+                      - Math.abs(company.totals.pye_net_incurred)
+                      - Math.abs(company.totals.pye_net_unreported);
+
     const lossRatio = company.totals.net_earned_premium > 0
       ? (netUltimate / company.totals.net_earned_premium) * 100
       : 0;

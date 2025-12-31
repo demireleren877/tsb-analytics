@@ -87,6 +87,8 @@ export interface ComparisonData {
     net_earned_premium: number;
     net_incurred: number;
     net_unreported: number;
+    pye_net_incurred: number;
+    pye_net_unreported: number;
   }[];
   totals: {
     gross_premium: number;
@@ -95,6 +97,8 @@ export interface ComparisonData {
     net_earned_premium: number;
     net_incurred: number;
     net_unreported: number;
+    pye_net_incurred: number;
+    pye_net_unreported: number;
   };
 }
 
