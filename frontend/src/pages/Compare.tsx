@@ -44,8 +44,8 @@ export function Compare() {
   });
 
   const { data: comparison, isLoading } = useQuery({
-    queryKey: ['comparison', selectedCompanies, selectedPeriod],
-    queryFn: () => compareCompanies(selectedCompanies, selectedPeriod),
+    queryKey: ['comparison', selectedCompanies, selectedPeriod, selectedBranch],
+    queryFn: () => compareCompanies(selectedCompanies, selectedPeriod, selectedBranch || undefined),
     enabled: selectedCompanies.length >= 2,
   });
 

@@ -48,9 +48,16 @@ export const getPeriods = async (): Promise<Period[]> => {
 };
 
 // Analytics
-export const getDashboard = async (period?: string): Promise<DashboardData> => {
-  const params = period ? `?period=${period}` : '';
-  const response = await api.get(`/api/analytics/dashboard${params}`);
+export const getDashboard = async (period?: string, branch?: string, companyIds?: number[]): Promise<DashboardData> => {
+  const params = new URLSearchParams();
+  if (period) params.append('period', period);
+  if (branch) params.append('branch', branch);
+  if (companyIds && companyIds.length > 0) {
+    companyIds.forEach(id => params.append('companies', id.toString()));
+  }
+
+  const queryString = params.toString();
+  const response = await api.get(`/api/analytics/dashboard${queryString ? '?' + queryString : ''}`);
   return response.data.data;
 };
 

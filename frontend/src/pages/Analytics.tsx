@@ -42,8 +42,8 @@ export function Analytics() {
   });
 
   const { data: dashboard } = useQuery({
-    queryKey: ['dashboard', selectedPeriod],
-    queryFn: () => getDashboard(selectedPeriod),
+    queryKey: ['dashboard', selectedPeriod, selectedBranch],
+    queryFn: () => getDashboard(selectedPeriod, selectedBranch || undefined),
   });
 
   const { data: rankings, isLoading } = useQuery({

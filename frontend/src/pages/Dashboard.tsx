@@ -38,8 +38,8 @@ export function Dashboard() {
   });
 
   const { data: dashboard, isLoading } = useQuery({
-    queryKey: ['dashboard', selectedPeriod],
-    queryFn: () => getDashboard(selectedPeriod),
+    queryKey: ['dashboard', selectedPeriod, selectedBranch, selectedCompanies],
+    queryFn: () => getDashboard(selectedPeriod, selectedBranch || undefined, selectedCompanies.length > 0 ? selectedCompanies : undefined),
   });
 
   const toggleCompany = (companyId: number) => {
