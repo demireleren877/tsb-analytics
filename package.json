@@ -1,0 +1,34 @@
+{
+  "name": "tsb-file-monitor",
+  "version": "1.0.0",
+  "description": "TSB dosya değişiklik monitörü ve mail bildirimi",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "check": "ts-node src/index.ts --check-once",
+    "get-token": "ts-node src/get-gmail-token.ts",
+    "bulk-download": "ts-node src/bulk-download.ts",
+    "api-download": "ts-node src/api-download.ts",
+    "combine": "ts-node src/combine-data.ts",
+    "analyze": "ts-node src/analyze-data.ts",
+    "upload-to-d1": "ts-node src/d1-uploader.ts"
+  },
+  "keywords": ["tsb", "monitor", "automation"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "node-cron": "^3.0.3",
+    "dotenv": "^16.3.1",
+    "axios": "^1.6.2",
+    "googleapis": "^128.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "@types/node-cron": "^3.0.11",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  }
+}

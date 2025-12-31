@@ -1,0 +1,281 @@
+import { Hono } from 'hono';
+
+type Bindings = {
+  DB: D1Database;
+};
+
+const comparisons = new Hono<{ Bindings: Bindings }>();
+
+// POST /api/comparisons/companies - Şirketleri karşılaştır
+comparisons.post('/companies', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { companyIds, period, branch } = body;
+
+    if (!companyIds || !Array.isArray(companyIds) || companyIds.length < 2) {
+      return c.json({
+        success: false,
+        error: 'At least 2 company IDs are required',
+      }, 400);
+    }
+
+    const currentPeriod = period || '20253';
+    const placeholders = companyIds.map(() => '?').join(',');
+
+    let query = `
+      SELECT
+        c.id,
+        c.name,
+        c.code,
+        fd.branch_code,
+        bc.name as branch_name,
+        SUM(fd.gross_written_premium) as gross_premium,
+        SUM(fd.net_premium) as net_premium,
+        SUM(fd.net_payment) as net_payment,
+        SUM(fd.net_earned_premium) as net_earned_premium,
+        SUM(fd.net_incurred) as net_incurred,
+        SUM(fd.net_unreported) as net_unreported
+      FROM financial_data fd
+      JOIN companies c ON fd.company_id = c.id
+      JOIN branch_codes bc ON fd.branch_code = bc.code
+      WHERE fd.company_id IN (${placeholders})
+      AND fd.period = ?
+    `;
+    const params = [...companyIds, currentPeriod];
+
+    if (branch) {
+      query += ' AND fd.branch_code = ?';
+      params.push(branch);
+    }
+
+    query += ' GROUP BY c.id, c.name, c.code, fd.branch_code, bc.name';
+    query += ' ORDER BY c.name ASC, fd.branch_code ASC';
+
+    const result = await c.env.DB.prepare(query).bind(...params).all();
+
+    // Group by company
+    const companyData: any = {};
+    result.results?.forEach((row: any) => {
+      if (!companyData[row.id]) {
+        companyData[row.id] = {
+          id: row.id,
+          name: row.name,
+          code: row.code,
+          branches: [],
+          totals: {
+            gross_premium: 0,
+            net_premium: 0,
+            net_payment: 0,
+            net_earned_premium: 0,
+            net_incurred: 0,
+            net_unreported: 0,
+          },
+        };
+      }
+
+      companyData[row.id].branches.push({
+        code: row.branch_code,
+        name: row.branch_name,
+        gross_premium: row.gross_premium,
+        net_premium: row.net_premium,
+        net_payment: row.net_payment,
+        net_earned_premium: row.net_earned_premium,
+        net_incurred: row.net_incurred,
+        net_unreported: row.net_unreported,
+      });
+
+      // Add to totals
+      companyData[row.id].totals.gross_premium += row.gross_premium || 0;
+      companyData[row.id].totals.net_premium += row.net_premium || 0;
+      companyData[row.id].totals.net_payment += row.net_payment || 0;
+      companyData[row.id].totals.net_earned_premium += row.net_earned_premium || 0;
+      companyData[row.id].totals.net_incurred += row.net_incurred || 0;
+      companyData[row.id].totals.net_unreported += row.net_unreported || 0;
+    });
+
+    return c.json({
+      success: true,
+      data: Object.values(companyData),
+      period: currentPeriod,
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message,
+    }, 500);
+  }
+});
+
+// GET /api/comparisons/yoy - Year over Year karşılaştırma
+comparisons.get('/yoy', async (c) => {
+  try {
+    const { company, currentPeriod = '20253' } = c.req.query();
+
+    if (!company) {
+      return c.json({
+        success: false,
+        error: 'Company ID is required',
+      }, 400);
+    }
+
+    // Calculate previous year same quarter
+    const year = parseInt(currentPeriod.substring(0, 4));
+    const quarter = currentPeriod.substring(4);
+    const previousPeriod = `${year - 1}${quarter}`;
+
+    const current = await c.env.DB.prepare(`
+      SELECT
+        SUM(net_premium) as net_premium,
+        SUM(net_payment) as net_payment,
+        SUM(net_earned_premium) as net_earned_premium
+      FROM financial_data
+      WHERE company_id = ? AND period = ?
+    `).bind(company, currentPeriod).first();
+
+    const previous = await c.env.DB.prepare(`
+      SELECT
+        SUM(net_premium) as net_premium,
+        SUM(net_payment) as net_payment,
+        SUM(net_earned_premium) as net_earned_premium
+      FROM financial_data
+      WHERE company_id = ? AND period = ?
+    `).bind(company, previousPeriod).first();
+
+    const calculateGrowth = (current: number, previous: number) => {
+      if (!previous) return 0;
+      return ((current - previous) / previous) * 100;
+    };
+
+    return c.json({
+      success: true,
+      data: {
+        current: {
+          period: currentPeriod,
+          net_premium: current?.net_premium || 0,
+          net_payment: current?.net_payment || 0,
+          net_earned_premium: current?.net_earned_premium || 0,
+        },
+        previous: {
+          period: previousPeriod,
+          net_premium: previous?.net_premium || 0,
+          net_payment: previous?.net_payment || 0,
+          net_earned_premium: previous?.net_earned_premium || 0,
+        },
+        growth: {
+          net_premium: parseFloat(calculateGrowth(
+            current?.net_premium || 0,
+            previous?.net_premium || 0
+          ).toFixed(2)),
+          net_payment: parseFloat(calculateGrowth(
+            current?.net_payment || 0,
+            previous?.net_payment || 0
+          ).toFixed(2)),
+          net_earned_premium: parseFloat(calculateGrowth(
+            current?.net_earned_premium || 0,
+            previous?.net_earned_premium || 0
+          ).toFixed(2)),
+        },
+      },
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message,
+    }, 500);
+  }
+});
+
+// GET /api/comparisons/qoq - Quarter over Quarter karşılaştırma
+comparisons.get('/qoq', async (c) => {
+  try {
+    const { company, currentPeriod = '20253' } = c.req.query();
+
+    if (!company) {
+      return c.json({
+        success: false,
+        error: 'Company ID is required',
+      }, 400);
+    }
+
+    // Calculate previous quarter
+    const year = parseInt(currentPeriod.substring(0, 4));
+    const quarter = parseInt(currentPeriod.substring(4));
+    let previousPeriod: string;
+
+    if (quarter === 1) {
+      previousPeriod = `${year - 1}4`;
+    } else {
+      previousPeriod = `${year}${quarter - 1}`;
+    }
+
+    const current = await c.env.DB.prepare(`
+      SELECT
+        SUM(net_premium) as net_premium,
+        SUM(net_payment) as net_payment,
+        SUM(net_earned_premium) as net_earned_premium,
+        SUM(net_incurred) as net_incurred
+      FROM financial_data
+      WHERE company_id = ? AND period = ?
+    `).bind(company, currentPeriod).first();
+
+    const previous = await c.env.DB.prepare(`
+      SELECT
+        SUM(net_premium) as net_premium,
+        SUM(net_payment) as net_payment,
+        SUM(net_earned_premium) as net_earned_premium,
+        SUM(net_incurred) as net_incurred
+      FROM financial_data
+      WHERE company_id = ? AND period = ?
+    `).bind(company, previousPeriod).first();
+
+    const calculateGrowth = (current: number, previous: number) => {
+      if (!previous) return 0;
+      return ((current - previous) / previous) * 100;
+    };
+
+    return c.json({
+      success: true,
+      data: {
+        current: {
+          period: currentPeriod,
+          net_premium: current?.net_premium || 0,
+          net_payment: current?.net_payment || 0,
+          net_earned_premium: current?.net_earned_premium || 0,
+          net_incurred: current?.net_incurred || 0,
+        },
+        previous: {
+          period: previousPeriod,
+          net_premium: previous?.net_premium || 0,
+          net_payment: previous?.net_payment || 0,
+          net_earned_premium: previous?.net_earned_premium || 0,
+          net_incurred: previous?.net_incurred || 0,
+        },
+        growth: {
+          net_premium: parseFloat(calculateGrowth(
+            current?.net_premium || 0,
+            previous?.net_premium || 0
+          ).toFixed(2)),
+          net_payment: parseFloat(calculateGrowth(
+            current?.net_payment || 0,
+            previous?.net_payment || 0
+          ).toFixed(2)),
+          net_earned_premium: parseFloat(calculateGrowth(
+            current?.net_earned_premium || 0,
+            previous?.net_earned_premium || 0
+          ).toFixed(2)),
+          net_incurred: parseFloat(calculateGrowth(
+            current?.net_incurred || 0,
+            previous?.net_incurred || 0
+          ).toFixed(2)),
+        },
+      },
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message,
+    }, 500);
+  }
+});
+
+export { comparisons };

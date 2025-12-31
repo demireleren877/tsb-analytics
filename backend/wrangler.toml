@@ -1,0 +1,22 @@
+name = "tsb-analytics-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "tsb-analytics-db"
+database_id = "6e3867a0-1f95-467d-8417-3a431a464871"
+
+# CORS ayarları için environment variables
+[vars]
+ALLOWED_ORIGINS = "*"
+API_VERSION = "v1"
+
+# Production environment
+[env.production]
+name = "tsb-analytics-api-production"
+
+# Development environment
+[env.development]
+name = "tsb-analytics-api-development"

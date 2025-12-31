@@ -1,0 +1,33 @@
+{
+  "name": "tsb-analytics-backend",
+  "version": "1.0.0",
+  "description": "TSB Analytics Platform - Backend API (Cloudflare Workers)",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "d1:create": "wrangler d1 create tsb-analytics-db",
+    "d1:migrate": "wrangler d1 migrations apply tsb-analytics-db",
+    "d1:console": "wrangler d1 execute tsb-analytics-db --command",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "cloudflare-workers",
+    "d1",
+    "api",
+    "analytics"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "wrangler": "^3.96.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.36.4",
+    "hono": "^4.7.11",
+    "zod": "^3.24.1"
+  }
+}
