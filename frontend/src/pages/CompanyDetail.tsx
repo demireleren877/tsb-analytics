@@ -9,6 +9,8 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  BarChart,
+  Bar,
 } from 'recharts';
 import { ArrowLeft, TrendingUp, TrendingDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -27,15 +29,28 @@ export function CompanyDetail() {
     queryFn: () => getCompany(companyId),
   });
 
+  // Get trends for different metrics
   const { data: premiumTrends } = useQuery({
     queryKey: ['trends', companyId, 'net_premium'],
     queryFn: () => getTrends(companyId, 'net_premium', 8),
     enabled: !!companyId,
   });
 
-  const { data: claimsTrends } = useQuery({
+  const { data: paymentTrends } = useQuery({
     queryKey: ['trends', companyId, 'net_payment'],
     queryFn: () => getTrends(companyId, 'net_payment', 8),
+    enabled: !!companyId,
+  });
+
+  const { data: unreportedTrends } = useQuery({
+    queryKey: ['trends', companyId, 'net_unreported'],
+    queryFn: () => getTrends(companyId, 'net_unreported', 8),
+    enabled: !!companyId,
+  });
+
+  const { data: earnedTrends } = useQuery({
+    queryKey: ['trends', companyId, 'net_earned_premium'],
+    queryFn: () => getTrends(companyId, 'net_earned_premium', 8),
     enabled: !!companyId,
   });
 
@@ -47,14 +62,20 @@ export function CompanyDetail() {
 
   if (companyLoading) return <Loading />;
 
-  const trendData = premiumTrends?.map((item, index) => ({
+  // Combine all metrics by period
+  const quarterlyData = premiumTrends?.map((item, index) => ({
     period: formatPeriod(item.period),
     net_premium: item.value,
-    net_payment: Math.abs(claimsTrends?.[index]?.value || 0),
+    net_payment: Math.abs(paymentTrends?.[index]?.value || 0),
+    net_unreported: Math.abs(unreportedTrends?.[index]?.value || 0),
+    net_earned_premium: earnedTrends?.[index]?.value || 0,
+    loss_ratio:
+      (Math.abs(paymentTrends?.[index]?.value || 0) / item.value) * 100,
   }));
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center space-x-4">
         <Link to="/companies" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-5 w-5" />
@@ -98,15 +119,15 @@ export function CompanyDetail() {
         />
       </div>
 
-      {/* Trend Charts */}
+      {/* Quarterly Metrics Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Finansal Performans Trendi</CardTitle>
-          <CardDescription>Son 8 çeyrek</CardDescription>
+          <CardTitle>Çeyreklik Metrikler</CardTitle>
+          <CardDescription>Net Ödeme, Muallak (Raporlanmayan), Kazanılmış Prim - Son 8 Çeyrek</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={trendData}>
+            <LineChart data={quarterlyData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="period" />
               <YAxis tickFormatter={(value) => `${(value / 1_000_000_000).toFixed(1)}B`} />
@@ -114,18 +135,26 @@ export function CompanyDetail() {
               <Legend />
               <Line
                 type="monotone"
-                dataKey="net_premium"
-                stroke="#3b82f6"
+                dataKey="net_payment"
+                stroke="#ef4444"
                 strokeWidth={2}
-                name="Net Prim"
+                name="Net Ödeme"
                 dot={{ r: 4 }}
               />
               <Line
                 type="monotone"
-                dataKey="net_payment"
-                stroke="#ef4444"
+                dataKey="net_unreported"
+                stroke="#f59e0b"
                 strokeWidth={2}
-                name="Net Hasar Ödemesi"
+                name="Muallak (Raporlanmayan)"
+                dot={{ r: 4 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="net_earned_premium"
+                stroke="#10b981"
+                strokeWidth={2}
+                name="Kazanılmış Prim (EP)"
                 dot={{ r: 4 }}
               />
             </LineChart>
@@ -133,24 +162,40 @@ export function CompanyDetail() {
         </CardContent>
       </Card>
 
+      {/* Net Prim vs Net Ödeme */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Net Prim vs Net Ödeme</CardTitle>
+          <CardDescription>Prim üretimi ve hasar karşılaştırması</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={quarterlyData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="period" />
+              <YAxis tickFormatter={(value) => `${(value / 1_000_000_000).toFixed(1)}B`} />
+              <Tooltip formatter={(value: any) => formatCurrency(value as number)} />
+              <Legend />
+              <Bar dataKey="net_premium" fill="#3b82f6" name="Net Prim" />
+              <Bar dataKey="net_payment" fill="#ef4444" name="Net Ödeme" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
       {/* Loss Ratio Trend */}
       <Card>
         <CardHeader>
-          <CardTitle>Hasar Prim Oranı</CardTitle>
+          <CardTitle>Hasar Prim Oranı Trendi</CardTitle>
           <CardDescription>Dönemsel loss ratio analizi</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart
-              data={trendData?.map((item) => ({
-                period: item.period,
-                loss_ratio: (item.net_payment / item.net_premium) * 100,
-              }))}
-            >
+            <LineChart data={quarterlyData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="period" />
               <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
-              <Tooltip formatter={(value: any) => formatPercent(value)} />
+              <Tooltip formatter={(value: any) => formatPercent(value as number)} />
               <Line
                 type="monotone"
                 dataKey="loss_ratio"
@@ -161,6 +206,62 @@ export function CompanyDetail() {
               />
             </LineChart>
           </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Detailed Quarterly Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Detaylı Çeyreklik Analiz</CardTitle>
+          <CardDescription>Son 8 çeyrek performans özeti</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-3">Dönem</th>
+                  <th className="text-right p-3">Net Prim</th>
+                  <th className="text-right p-3">Net Ödeme</th>
+                  <th className="text-right p-3">Muallak</th>
+                  <th className="text-right p-3">Kazanılmış Prim</th>
+                  <th className="text-right p-3">Loss Ratio</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quarterlyData?.map((row) => (
+                  <tr key={row.period} className="border-b hover:bg-muted/50">
+                    <td className="p-3 font-semibold">{row.period}</td>
+                    <td className="text-right p-3 font-mono">
+                      {formatCurrency(row.net_premium)}
+                    </td>
+                    <td className="text-right p-3 font-mono">
+                      {formatCurrency(row.net_payment)}
+                    </td>
+                    <td className="text-right p-3 font-mono">
+                      {formatCurrency(row.net_unreported)}
+                    </td>
+                    <td className="text-right p-3 font-mono">
+                      {formatCurrency(row.net_earned_premium)}
+                    </td>
+                    <td className="text-right p-3">
+                      <span
+                        className={`font-semibold ${
+                          row.loss_ratio > 80
+                            ? 'text-red-600'
+                            : row.loss_ratio < 60
+                            ? 'text-green-600'
+                            : 'text-yellow-600'
+                        }`}
+                      >
+                        {row.loss_ratio.toFixed(2)}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </div>

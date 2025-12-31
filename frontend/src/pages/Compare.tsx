@@ -9,10 +9,15 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
 } from 'recharts';
-import { GitCompare, Plus, X } from 'lucide-react';
-import { getCompanies, compareCompanies, getPeriods } from '../lib/api';
-import { formatCurrency, formatPeriod } from '../lib/utils';
+import { GitCompare, Plus, X, TrendingUp } from 'lucide-react';
+import { getCompanies, compareCompanies, getPeriods, getBranches } from '../lib/api';
+import { formatCurrency, formatPercent, formatPeriod } from '../lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/Card';
 import { Loading } from '../components/Loading';
 import { useStore } from '../store/useStore';
@@ -21,6 +26,7 @@ export function Compare() {
   const { selectedPeriod, setSelectedPeriod } = useStore();
   const [selectedCompanies, setSelectedCompanies] = useState<number[]>([]);
   const [showSelector, setShowSelector] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState('');
 
   const { data: companies } = useQuery({
     queryKey: ['companies'],
@@ -30,6 +36,11 @@ export function Compare() {
   const { data: periods } = useQuery({
     queryKey: ['periods'],
     queryFn: getPeriods,
+  });
+
+  const { data: branches } = useQuery({
+    queryKey: ['branches'],
+    queryFn: getBranches,
   });
 
   const { data: comparison, isLoading } = useQuery({
@@ -42,7 +53,7 @@ export function Compare() {
     setSelectedCompanies((prev) =>
       prev.includes(companyId)
         ? prev.filter((id) => id !== companyId)
-        : prev.length < 5
+        : prev.length < 6
         ? [...prev, companyId]
         : prev
     );
@@ -52,38 +63,94 @@ export function Compare() {
     name: company.name.substring(0, 20),
     net_premium: company.totals.net_premium,
     net_payment: Math.abs(company.totals.net_payment),
+    net_unreported: Math.abs(company.totals.net_unreported),
     net_earned_premium: company.totals.net_earned_premium,
+    loss_ratio: (Math.abs(company.totals.net_payment) / company.totals.net_premium) * 100,
   }));
+
+  // Market share calculation
+  const totalMarketPremium = comparison?.reduce((sum, c) => sum + c.totals.net_premium, 0) || 1;
+  const marketShareData = comparison?.map((company) => ({
+    name: company.name.substring(0, 20),
+    market_share: (company.totals.net_premium / totalMarketPremium) * 100,
+  }));
+
+  // Performance radar chart data
+  const radarData = comparison?.map((company) => {
+    const lossRatio = (Math.abs(company.totals.net_payment) / company.totals.net_premium) * 100;
+    const marketShare = (company.totals.net_premium / totalMarketPremium) * 100;
+    return {
+      company: company.name.substring(0, 15),
+      'Prim Üretimi': (company.totals.net_premium / 1_000_000_000) * 10,
+      'Loss Ratio Performansı': Math.max(0, 100 - lossRatio),
+      'Pazar Payı': marketShare * 5,
+      'EP/WP Oranı': (company.totals.net_earned_premium / company.totals.net_premium) * 100,
+    };
+  });
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Şirket Karşılaştırma</h2>
-          <p className="text-muted-foreground">Birden fazla şirketi karşılaştırarak analiz edin</p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <label className="text-sm font-medium">Dönem:</label>
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {periods?.map((period) => (
-              <option key={period.period} value={period.period}>
-                {formatPeriod(period.period)}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">Yönetim Karşılaştırma Analizi</h2>
+        <p className="text-muted-foreground">Şirketlerin performanslarını karşılaştırmalı olarak inceleyin</p>
       </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Dönem</label>
+              <select
+                value={selectedPeriod}
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {periods?.map((period) => (
+                  <option key={period.period} value={period.period}>
+                    {formatPeriod(period.period)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Hazine Kodu</label>
+              <select
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="">Tüm Branşlar</option>
+                {branches?.map((branch) => (
+                  <option key={branch.code} value={branch.code}>
+                    {branch.code}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Şirketler (Karşılaştırma için)</label>
+              <button
+                onClick={() => setShowSelector(!showSelector)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-left hover:bg-accent"
+              >
+                {selectedCompanies.length > 0
+                  ? `${selectedCompanies.length} şirket seçili`
+                  : 'Şirket seçin...'}
+              </button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Company Selector */}
       <Card>
         <CardContent className="p-6">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Seçili Şirketler ({selectedCompanies.length}/5)</h3>
+              <h3 className="font-semibold">Seçili Şirketler ({selectedCompanies.length}/6)</h3>
               <button
                 onClick={() => setShowSelector(!showSelector)}
                 className="inline-flex items-center space-x-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
@@ -131,7 +198,7 @@ export function Compare() {
                       type="checkbox"
                       checked={selectedCompanies.includes(company.id)}
                       onChange={() => toggleCompany(company.id)}
-                      disabled={!selectedCompanies.includes(company.id) && selectedCompanies.length >= 5}
+                      disabled={!selectedCompanies.includes(company.id) && selectedCompanies.length >= 6}
                       className="h-4 w-4 rounded border-gray-300"
                     />
                     <span className="text-sm">{company.name}</span>
@@ -150,81 +217,201 @@ export function Compare() {
             <Loading />
           ) : (
             <div className="space-y-6">
-              {/* Net Premium Comparison */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Net Prim Karşılaştırması</CardTitle>
-                  <CardDescription>{formatPeriod(selectedPeriod)}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                      <YAxis tickFormatter={(value) => `${(value / 1_000_000_000).toFixed(1)}B`} />
-                      <Tooltip formatter={(value: any) => formatCurrency(value as number)} />
-                      <Bar dataKey="net_premium" fill="#3b82f6" name="Net Prim" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+              {/* Performance Overview Cards */}
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Toplam Net Prim</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {formatCurrency(comparison?.reduce((sum, c) => sum + c.totals.net_premium, 0) || 0)}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {selectedCompanies.length} şirket toplamı
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Ortalama Loss Ratio</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {formatPercent(
+                        (comparison?.reduce((sum, c) => sum + (Math.abs(c.totals.net_payment) / c.totals.net_premium) * 100, 0) || 0) /
+                        (selectedCompanies.length || 1)
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Seçili şirketler ortalaması
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">En Yüksek Performans</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-lg font-bold">
+                      {comparison?.[0]?.name.substring(0, 25)}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Net prim bazında
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
 
               {/* Multi-Metric Comparison */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Detaylı Karşılaştırma</CardTitle>
-                  <CardDescription>Net prim, hasar ve kazanılmış prim</CardDescription>
+                  <CardTitle>Kapsamlı Performans Karşılaştırması</CardTitle>
+                  <CardDescription>Net Prim, Net Ödeme, Muallak (Raporlanmayan), Kazanılmış Prim</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={400}>
                     <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} fontSize={11} />
                       <YAxis tickFormatter={(value) => `${(value / 1_000_000_000).toFixed(1)}B`} />
                       <Tooltip formatter={(value: any) => formatCurrency(value as number)} />
                       <Legend />
                       <Bar dataKey="net_premium" fill="#3b82f6" name="Net Prim" />
-                      <Bar dataKey="net_payment" fill="#ef4444" name="Hasar Ödemesi" />
+                      <Bar dataKey="net_payment" fill="#ef4444" name="Net Ödeme" />
+                      <Bar dataKey="net_unreported" fill="#f59e0b" name="Muallak" />
                       <Bar dataKey="net_earned_premium" fill="#10b981" name="Kazanılmış Prim" />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
 
-              {/* Table View */}
+              {/* Loss Ratio Comparison */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Detaylı Tablo</CardTitle>
+                  <CardTitle>Loss Ratio Karşılaştırması</CardTitle>
+                  <CardDescription>Hasar prim oranları analizi</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} fontSize={11} />
+                      <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
+                      <Tooltip formatter={(value: any) => formatPercent(value as number)} />
+                      <Bar dataKey="loss_ratio" fill="#f59e0b" name="Loss Ratio (%)" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Market Share */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pazar Payı Dağılımı</CardTitle>
+                  <CardDescription>Seçili şirketler arasında pazar payı</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={marketShareData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} fontSize={11} />
+                      <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
+                      <Tooltip formatter={(value: any) => `${(value as number).toFixed(2)}%`} />
+                      <Bar dataKey="market_share" fill="#8b5cf6" name="Pazar Payı (%)" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Performance Radar Chart */}
+              {radarData && radarData.length <= 6 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Çok Boyutlu Performans Analizi</CardTitle>
+                    <CardDescription>Şirketlerin farklı metriklerdeki konumları</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={400}>
+                      <RadarChart data={radarData}>
+                        <PolarGrid />
+                        <PolarAngleAxis dataKey="company" fontSize={11} />
+                        <PolarRadiusAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Radar name="Prim Üretimi" dataKey="Prim Üretimi" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
+                        <Radar name="Loss Ratio Performansı" dataKey="Loss Ratio Performansı" stroke="#10b981" fill="#10b981" fillOpacity={0.3} />
+                        <Radar name="Pazar Payı" dataKey="Pazar Payı" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.3} />
+                        <Radar name="EP/WP Oranı" dataKey="EP/WP Oranı" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.3} />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Detailed Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Detaylı Karşılaştırma Tablosu</CardTitle>
+                  <CardDescription>{formatPeriod(selectedPeriod)}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b">
-                          <th className="text-left p-2">Şirket</th>
-                          <th className="text-right p-2">Net Prim</th>
-                          <th className="text-right p-2">Hasar Ödemesi</th>
-                          <th className="text-right p-2">Kazanılmış Prim</th>
-                          <th className="text-right p-2">Loss Ratio</th>
+                          <th className="text-left p-3">Sıra</th>
+                          <th className="text-left p-3">Şirket</th>
+                          <th className="text-right p-3">Net Prim</th>
+                          <th className="text-right p-3">Net Ödeme</th>
+                          <th className="text-right p-3">Muallak</th>
+                          <th className="text-right p-3">Kazanılmış Prim</th>
+                          <th className="text-right p-3">Loss Ratio</th>
+                          <th className="text-right p-3">Pazar Payı</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {comparison?.map((company) => {
+                        {comparison?.map((company, index) => {
                           const lossRatio =
                             (Math.abs(company.totals.net_payment) / company.totals.net_premium) * 100;
+                          const marketShare = (company.totals.net_premium / totalMarketPremium) * 100;
                           return (
-                            <tr key={company.id} className="border-b">
-                              <td className="p-2 font-medium">{company.name}</td>
-                              <td className="text-right p-2">
+                            <tr key={company.id} className="border-b hover:bg-muted/50">
+                              <td className="p-3">
+                                <div className="flex items-center space-x-2">
+                                  <span className="font-semibold">{index + 1}</span>
+                                  {index === 0 && <TrendingUp className="h-4 w-4 text-green-600" />}
+                                </div>
+                              </td>
+                              <td className="p-3 font-medium">{company.name}</td>
+                              <td className="text-right p-3 font-mono">
                                 {formatCurrency(company.totals.net_premium)}
                               </td>
-                              <td className="text-right p-2">
+                              <td className="text-right p-3 font-mono">
                                 {formatCurrency(Math.abs(company.totals.net_payment))}
                               </td>
-                              <td className="text-right p-2">
+                              <td className="text-right p-3 font-mono">
+                                {formatCurrency(Math.abs(company.totals.net_unreported))}
+                              </td>
+                              <td className="text-right p-3 font-mono">
                                 {formatCurrency(company.totals.net_earned_premium)}
                               </td>
-                              <td className="text-right p-2">{lossRatio.toFixed(2)}%</td>
+                              <td className="text-right p-3">
+                                <span
+                                  className={`font-semibold ${
+                                    lossRatio > 80
+                                      ? 'text-red-600'
+                                      : lossRatio < 60
+                                      ? 'text-green-600'
+                                      : 'text-yellow-600'
+                                  }`}
+                                >
+                                  {lossRatio.toFixed(2)}%
+                                </span>
+                              </td>
+                              <td className="text-right p-3 font-mono">
+                                {marketShare.toFixed(2)}%
+                              </td>
                             </tr>
                           );
                         })}
