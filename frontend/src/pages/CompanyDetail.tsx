@@ -9,13 +9,13 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-  BarChart,
   Bar,
   ComposedChart,
 } from 'recharts';
 import { ArrowLeft, TrendingUp, TrendingDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { getCompany, getTrends, getGrowth } from '../lib/api';
+import { useState } from 'react';
+import { getCompany, getTrends, getGrowth, getBranches } from '../lib/api';
 import { formatCurrency, formatPercent, formatPeriod } from '../lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/Card';
 import { MetricCard } from '../components/MetricCard';
@@ -24,46 +24,52 @@ import { Loading } from '../components/Loading';
 export function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
   const companyId = parseInt(id || '0');
+  const [selectedBranch, setSelectedBranch] = useState('');
 
   const { data: company, isLoading: companyLoading } = useQuery({
     queryKey: ['company', companyId],
     queryFn: () => getCompany(companyId),
   });
 
+  const { data: branches } = useQuery({
+    queryKey: ['branches'],
+    queryFn: getBranches,
+  });
+
   // Get trends for different metrics
   const { data: premiumTrends } = useQuery({
-    queryKey: ['trends', companyId, 'net_premium'],
-    queryFn: () => getTrends(companyId, 'net_premium', 8),
+    queryKey: ['trends', companyId, 'net_premium', selectedBranch],
+    queryFn: () => getTrends(companyId, 'net_premium', 8, selectedBranch || undefined),
     enabled: !!companyId,
   });
 
   const { data: paymentTrends } = useQuery({
-    queryKey: ['trends', companyId, 'net_payment'],
-    queryFn: () => getTrends(companyId, 'net_payment', 8),
+    queryKey: ['trends', companyId, 'net_payment', selectedBranch],
+    queryFn: () => getTrends(companyId, 'net_payment', 8, selectedBranch || undefined),
     enabled: !!companyId,
   });
 
   const { data: unreportedTrends } = useQuery({
-    queryKey: ['trends', companyId, 'net_unreported'],
-    queryFn: () => getTrends(companyId, 'net_unreported', 8),
+    queryKey: ['trends', companyId, 'net_unreported', selectedBranch],
+    queryFn: () => getTrends(companyId, 'net_unreported', 8, selectedBranch || undefined),
     enabled: !!companyId,
   });
 
   const { data: earnedTrends } = useQuery({
-    queryKey: ['trends', companyId, 'net_earned_premium'],
-    queryFn: () => getTrends(companyId, 'net_earned_premium', 8),
+    queryKey: ['trends', companyId, 'net_earned_premium', selectedBranch],
+    queryFn: () => getTrends(companyId, 'net_earned_premium', 8, selectedBranch || undefined),
     enabled: !!companyId,
   });
 
   const { data: incurredTrends } = useQuery({
-    queryKey: ['trends', companyId, 'net_incurred'],
-    queryFn: () => getTrends(companyId, 'net_incurred', 8),
+    queryKey: ['trends', companyId, 'net_incurred', selectedBranch],
+    queryFn: () => getTrends(companyId, 'net_incurred', 8, selectedBranch || undefined),
     enabled: !!companyId,
   });
 
   const { data: growth } = useQuery({
-    queryKey: ['growth', companyId],
-    queryFn: () => getGrowth(companyId, 'net_premium'),
+    queryKey: ['growth', companyId, selectedBranch],
+    queryFn: () => getGrowth(companyId, 'net_premium', selectedBranch || undefined),
     enabled: !!companyId,
   });
 
@@ -105,6 +111,27 @@ export function CompanyDetail() {
           <p className="text-muted-foreground">Kod: {company?.code}</p>
         </div>
       </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium">Branş:</label>
+            <select
+              value={selectedBranch}
+              onChange={(e) => setSelectedBranch(e.target.value)}
+              className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">Tüm Branşlar</option>
+              {branches?.map((branch) => (
+                <option key={branch.code} value={branch.code}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Growth Metrics */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -224,53 +251,6 @@ export function CompanyDetail() {
                 dot={{ r: 5, fill: '#ef4444' }}
               />
             </ComposedChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Net Prim vs Net Ödeme */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Net Prim vs Net Ödeme</CardTitle>
-          <CardDescription>Prim üretimi ve hasar karşılaştırması</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={quarterlyData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="period" />
-              <YAxis tickFormatter={(value) => `${(value / 1_000_000_000).toFixed(1)}B`} />
-              <Tooltip formatter={(value: any) => formatCurrency(value as number)} />
-              <Legend />
-              <Bar dataKey="net_premium" fill="#3b82f6" name="Net Prim" />
-              <Bar dataKey="net_payment" fill="#ef4444" name="Net Ödeme" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Loss Ratio Trend */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Hasar Prim Oranı Trendi</CardTitle>
-          <CardDescription>Dönemsel loss ratio analizi</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={quarterlyData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="period" />
-              <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
-              <Tooltip formatter={(value: any) => formatPercent(value as number)} />
-              <Line
-                type="monotone"
-                dataKey="loss_ratio"
-                stroke="#f59e0b"
-                strokeWidth={2}
-                name="Loss Ratio (%)"
-                dot={{ r: 4 }}
-              />
-            </LineChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>

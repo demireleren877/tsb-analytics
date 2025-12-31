@@ -9,29 +9,38 @@ const analytics = new Hono<{ Bindings: Bindings }>();
 // GET /api/analytics/dashboard - Dashboard metrikleri
 analytics.get('/dashboard', async (c) => {
   try {
-    const { period } = c.req.query();
+    const { period, branch } = c.req.query();
     const currentPeriod = period || '20253'; // Default to latest period
+
+    // Build WHERE clause for branch filtering
+    let whereClause = 'WHERE period = ?';
+    const baseParams: any[] = [currentPeriod];
+
+    if (branch) {
+      whereClause += ' AND branch_code = ?';
+      baseParams.push(branch);
+    }
 
     // Toplam prim üretimi
     const totalPremium = await c.env.DB.prepare(`
       SELECT SUM(net_premium) as total
       FROM financial_data
-      WHERE period = ?
-    `).bind(currentPeriod).first();
+      ${whereClause}
+    `).bind(...baseParams).first();
 
     // Toplam hasar ödemeleri
     const totalClaims = await c.env.DB.prepare(`
       SELECT SUM(net_payment) as total
       FROM financial_data
-      WHERE period = ?
-    `).bind(currentPeriod).first();
+      ${whereClause}
+    `).bind(...baseParams).first();
 
     // Aktif şirket sayısı
     const activeCompanies = await c.env.DB.prepare(`
       SELECT COUNT(DISTINCT company_id) as total
       FROM financial_data
-      WHERE period = ?
-    `).bind(currentPeriod).first();
+      ${whereClause}
+    `).bind(...baseParams).first();
 
     // Loss ratio (Hasar/Prim)
     const lossRatio = totalPremium?.total && totalClaims?.total
@@ -39,7 +48,7 @@ analytics.get('/dashboard', async (c) => {
       : 0;
 
     // Branş bazında dağılım
-    const branchDistribution = await c.env.DB.prepare(`
+    let branchQuery = `
       SELECT
         bc.code,
         bc.name,
@@ -48,10 +57,11 @@ analytics.get('/dashboard', async (c) => {
         COUNT(DISTINCT fd.company_id) as company_count
       FROM financial_data fd
       JOIN branch_codes bc ON fd.branch_code = bc.code
-      WHERE fd.period = ?
+      ${whereClause}
       GROUP BY bc.code, bc.name
       ORDER BY total_premium DESC
-    `).bind(currentPeriod).all();
+    `;
+    const branchDistribution = await c.env.DB.prepare(branchQuery).bind(...baseParams).all();
 
     return c.json({
       success: true,
@@ -76,7 +86,7 @@ analytics.get('/dashboard', async (c) => {
 // GET /api/analytics/trends - Trend verileri
 analytics.get('/trends', async (c) => {
   try {
-    const { company, metric = 'net_premium', periods = '8' } = c.req.query();
+    const { company, metric = 'net_premium', periods = '8', branch } = c.req.query();
 
     if (!company) {
       return c.json({
@@ -85,16 +95,26 @@ analytics.get('/trends', async (c) => {
       }, 400);
     }
 
-    const result = await c.env.DB.prepare(`
+    let query = `
       SELECT
         period,
         SUM(${metric}) as value
       FROM financial_data
       WHERE company_id = ?
-      GROUP BY period
-      ORDER BY period DESC
-      LIMIT ?
-    `).bind(company, parseInt(periods)).all();
+    `;
+    const params: any[] = [company];
+
+    if (branch) {
+      query += ' AND branch_code = ?';
+      params.push(branch);
+    }
+
+    query += ` GROUP BY period`;
+    query += ` ORDER BY period DESC`;
+    query += ` LIMIT ?`;
+    params.push(parseInt(periods));
+
+    const result = await c.env.DB.prepare(query).bind(...params).all();
 
     return c.json({
       success: true,
@@ -162,7 +182,7 @@ analytics.get('/rankings', async (c) => {
 // GET /api/analytics/growth - Büyüme oranları
 analytics.get('/growth', async (c) => {
   try {
-    const { company, metric = 'net_premium' } = c.req.query();
+    const { company, metric = 'net_premium', branch } = c.req.query();
 
     if (!company) {
       return c.json({
@@ -190,17 +210,33 @@ analytics.get('/growth', async (c) => {
     const previousQuarter = periods.results[1].period;
 
     // QoQ (Quarter over Quarter)
-    const currentQoQ = await c.env.DB.prepare(`
+    let currentQuery = `
       SELECT SUM(${metric}) as value
       FROM financial_data
       WHERE company_id = ? AND period = ?
-    `).bind(company, currentPeriod).first();
+    `;
+    const currentParams: any[] = [company, currentPeriod];
 
-    const previousQoQ = await c.env.DB.prepare(`
+    if (branch) {
+      currentQuery += ' AND branch_code = ?';
+      currentParams.push(branch);
+    }
+
+    const currentQoQ = await c.env.DB.prepare(currentQuery).bind(...currentParams).first();
+
+    let previousQuery = `
       SELECT SUM(${metric}) as value
       FROM financial_data
       WHERE company_id = ? AND period = ?
-    `).bind(company, previousQuarter).first();
+    `;
+    const previousParams: any[] = [company, previousQuarter];
+
+    if (branch) {
+      previousQuery += ' AND branch_code = ?';
+      previousParams.push(branch);
+    }
+
+    const previousQoQ = await c.env.DB.prepare(previousQuery).bind(...previousParams).first();
 
     const qoqGrowth = currentQoQ?.value && previousQoQ?.value
       ? (((currentQoQ.value as number) - (previousQoQ.value as number)) / (previousQoQ.value as number)) * 100

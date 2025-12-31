@@ -94,12 +94,14 @@ export const getLossRatioRankings = async (
 export const getTrends = async (
   company: number,
   metric: string = 'net_premium',
-  periods: number = 8
+  periods: number = 8,
+  branch?: string
 ): Promise<TrendData[]> => {
   const params = new URLSearchParams();
   params.append('company', company.toString());
   params.append('metric', metric);
   params.append('periods', periods.toString());
+  if (branch) params.append('branch', branch);
 
   const response = await api.get(`/api/analytics/trends?${params.toString()}`);
   return response.data.data;
@@ -107,11 +109,13 @@ export const getTrends = async (
 
 export const getGrowth = async (
   company: number,
-  metric: string = 'net_premium'
+  metric: string = 'net_premium',
+  branch?: string
 ): Promise<GrowthData> => {
   const params = new URLSearchParams();
   params.append('company', company.toString());
   params.append('metric', metric);
+  if (branch) params.append('branch', branch);
 
   const response = await api.get(`/api/analytics/growth?${params.toString()}`);
   return response.data.data;
