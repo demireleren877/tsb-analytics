@@ -9,11 +9,14 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  
+  Line,
   RadarChart,
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
   Radar,
+  ComposedChart,
 } from 'recharts';
 import { GitCompare, Plus, X, TrendingUp } from 'lucide-react';
 import { getCompanies, compareCompanies, getPeriods, getBranches } from '../lib/api';
@@ -53,20 +56,30 @@ export function Compare() {
     setSelectedCompanies((prev) =>
       prev.includes(companyId)
         ? prev.filter((id) => id !== companyId)
-        : prev.length < 6
+        : prev.length < 10
         ? [...prev, companyId]
         : prev
     );
   };
 
-  const chartData = comparison?.map((company) => ({
-    name: company.name.substring(0, 20),
-    net_premium: company.totals.net_premium,
-    net_payment: Math.abs(company.totals.net_payment),
-    net_unreported: Math.abs(company.totals.net_unreported),
-    net_earned_premium: company.totals.net_earned_premium,
-    loss_ratio: (Math.abs(company.totals.net_payment) / company.totals.net_premium) * 100,
-  }));
+  const chartData = comparison?.map((company) => {
+    // Calculate Net Ultimate: Net Ödeme + Net Muallak (unreported)
+    // For simplicity, using current period data as we don't have delta calculations
+    const netUltimate = Math.abs(company.totals.net_payment) + Math.abs(company.totals.net_unreported);
+    const lossRatio = company.totals.net_earned_premium > 0
+      ? (netUltimate / company.totals.net_earned_premium) * 100
+      : 0;
+
+    return {
+      name: company.name.substring(0, 20),
+      net_premium: company.totals.net_premium,
+      net_payment: Math.abs(company.totals.net_payment),
+      net_unreported: Math.abs(company.totals.net_unreported),
+      net_earned_premium: company.totals.net_earned_premium,
+      net_ultimate: netUltimate,
+      loss_ratio: lossRatio,
+    };
+  });
 
   // Market share calculation
   const totalMarketPremium = comparison?.reduce((sum, c) => sum + c.totals.net_premium, 0) || 1;
@@ -150,7 +163,7 @@ export function Compare() {
         <CardContent className="p-6">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Seçili Şirketler ({selectedCompanies.length}/6)</h3>
+              <h3 className="font-semibold">Seçili Şirketler ({selectedCompanies.length}/10)</h3>
               <button
                 onClick={() => setShowSelector(!showSelector)}
                 className="inline-flex items-center space-x-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
@@ -198,7 +211,7 @@ export function Compare() {
                       type="checkbox"
                       checked={selectedCompanies.includes(company.id)}
                       onChange={() => toggleCompany(company.id)}
-                      disabled={!selectedCompanies.includes(company.id) && selectedCompanies.length >= 6}
+                      disabled={!selectedCompanies.includes(company.id) && selectedCompanies.length >= 10}
                       className="h-4 w-4 rounded border-gray-300"
                     />
                     <span className="text-sm">{company.name}</span>
@@ -282,6 +295,51 @@ export function Compare() {
                       <Bar dataKey="net_unreported" fill="#f59e0b" name="Muallak" />
                       <Bar dataKey="net_earned_premium" fill="#10b981" name="Kazanılmış Prim" />
                     </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Net EP, Net Ultimate and Loss Ratio Combined Chart */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Net EP vs Net Ultimate ve Loss Ratio</CardTitle>
+                  <CardDescription>Net Kazanılmış Prim, Net Ultimate (Sütun) ve Loss Ratio (Çizgi)</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <ComposedChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} fontSize={11} />
+                      <YAxis
+                        yAxisId="left"
+                        tickFormatter={(value) => `${(value / 1_000_000_000).toFixed(1)}B`}
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        tickFormatter={(value) => `${value.toFixed(0)}%`}
+                      />
+                      <Tooltip
+                        formatter={(value: any, name: any) => {
+                          if (name === 'Loss Ratio (%)') {
+                            return `${(value as number).toFixed(2)}%`;
+                          }
+                          return formatCurrency(value as number);
+                        }}
+                      />
+                      <Legend />
+                      <Bar yAxisId="left" dataKey="net_earned_premium" fill="#10b981" name="Net EP" />
+                      <Bar yAxisId="left" dataKey="net_ultimate" fill="#f59e0b" name="Net Ultimate" />
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="loss_ratio"
+                        stroke="#ef4444"
+                        strokeWidth={3}
+                        name="Loss Ratio (%)"
+                        dot={{ r: 5, fill: '#ef4444' }}
+                      />
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
