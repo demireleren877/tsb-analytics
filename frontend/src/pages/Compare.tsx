@@ -279,10 +279,34 @@ export function Compare() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-lg font-bold">
-                      {comparison?.[0]?.name.substring(0, 25)}
+                      {(() => {
+                        if (!comparison || comparison.length === 0) return '-';
+                        const bestCompany = comparison.reduce((best, company) => {
+                          const netUltimate = Math.abs(company.totals.net_payment)
+                                            + Math.abs(company.totals.net_incurred)
+                                            + Math.abs(company.totals.net_unreported)
+                                            - Math.abs(company.totals.pye_net_incurred)
+                                            - Math.abs(company.totals.pye_net_unreported);
+                          const lossRatio = company.totals.net_earned_premium > 0
+                            ? (netUltimate / company.totals.net_earned_premium) * 100
+                            : 999999;
+
+                          const bestNetUltimate = Math.abs(best.totals.net_payment)
+                                                + Math.abs(best.totals.net_incurred)
+                                                + Math.abs(best.totals.net_unreported)
+                                                - Math.abs(best.totals.pye_net_incurred)
+                                                - Math.abs(best.totals.pye_net_unreported);
+                          const bestLossRatio = best.totals.net_earned_premium > 0
+                            ? (bestNetUltimate / best.totals.net_earned_premium) * 100
+                            : 999999;
+
+                          return lossRatio < bestLossRatio ? company : best;
+                        });
+                        return bestCompany.name.substring(0, 25);
+                      })()}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Net prim bazında
+                      En düşük loss ratio
                     </p>
                   </CardContent>
                 </Card>

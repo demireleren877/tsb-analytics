@@ -11,6 +11,7 @@ import {
   Legend,
   BarChart,
   Bar,
+  ComposedChart,
 } from 'recharts';
 import { ArrowLeft, TrendingUp, TrendingDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -54,6 +55,12 @@ export function CompanyDetail() {
     enabled: !!companyId,
   });
 
+  const { data: incurredTrends } = useQuery({
+    queryKey: ['trends', companyId, 'net_incurred'],
+    queryFn: () => getTrends(companyId, 'net_incurred', 8),
+    enabled: !!companyId,
+  });
+
   const { data: growth } = useQuery({
     queryKey: ['growth', companyId],
     queryFn: () => getGrowth(companyId, 'net_premium'),
@@ -63,15 +70,28 @@ export function CompanyDetail() {
   if (companyLoading) return <Loading />;
 
   // Combine all metrics by period
-  const quarterlyData = premiumTrends?.map((item, index) => ({
-    period: formatPeriod(item.period),
-    net_premium: item.value,
-    net_payment: Math.abs(paymentTrends?.[index]?.value || 0),
-    net_unreported: Math.abs(unreportedTrends?.[index]?.value || 0),
-    net_earned_premium: earnedTrends?.[index]?.value || 0,
-    loss_ratio:
-      (Math.abs(paymentTrends?.[index]?.value || 0) / item.value) * 100,
-  }));
+  const quarterlyData = premiumTrends?.map((item, index) => {
+    // Calculate Net Ultimate for this period
+    // Note: We don't have PYE data in trends, so this is a simplified calculation
+    const netPayment = Math.abs(paymentTrends?.[index]?.value || 0);
+    const netIncurred = Math.abs(incurredTrends?.[index]?.value || 0);
+    const netUnreported = Math.abs(unreportedTrends?.[index]?.value || 0);
+    const netEP = earnedTrends?.[index]?.value || 0;
+
+    // Simplified Net Ultimate (without PYE delta since we don't have historical data in trends)
+    const netUltimate = netPayment + netIncurred + netUnreported;
+    const lossRatio = netEP > 0 ? (netUltimate / netEP) * 100 : 0;
+
+    return {
+      period: formatPeriod(item.period),
+      net_payment: netPayment,
+      net_incurred: netIncurred,
+      net_unreported: netUnreported,
+      net_earned_premium: netEP,
+      net_ultimate: netUltimate,
+      loss_ratio: lossRatio,
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -123,7 +143,7 @@ export function CompanyDetail() {
       <Card>
         <CardHeader>
           <CardTitle>Çeyreklik Metrikler</CardTitle>
-          <CardDescription>Net Ödeme, Muallak (Raporlanmayan), Kazanılmış Prim - Son 8 Çeyrek</CardDescription>
+          <CardDescription>Net Ödeme, Tahakkuk, Raporlanmayan, Kazanılmış Prim - Son 8 Çeyrek</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={400}>
@@ -143,10 +163,18 @@ export function CompanyDetail() {
               />
               <Line
                 type="monotone"
-                dataKey="net_unreported"
+                dataKey="net_incurred"
                 stroke="#f59e0b"
                 strokeWidth={2}
-                name="Muallak (Raporlanmayan)"
+                name="Net Tahakkuk"
+                dot={{ r: 4 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="net_unreported"
+                stroke="#8b5cf6"
+                strokeWidth={2}
+                name="Net Raporlanmayan"
                 dot={{ r: 4 }}
               />
               <Line
@@ -158,6 +186,44 @@ export function CompanyDetail() {
                 dot={{ r: 4 }}
               />
             </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Performance Chart: Net EP, Net Ultimate, Loss Ratio */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Performans Göstergeleri</CardTitle>
+          <CardDescription>Net EP, Net Ultimate ve Loss Ratio - Son 8 Çeyrek</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={400}>
+            <ComposedChart data={quarterlyData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="period" />
+              <YAxis yAxisId="left" tickFormatter={(value) => `${(value / 1_000_000_000).toFixed(1)}B`} />
+              <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => `${value.toFixed(0)}%`} />
+              <Tooltip
+                formatter={(value: any, name: any) => {
+                  if (name === 'Loss Ratio (%)') {
+                    return `${(value as number).toFixed(2)}%`;
+                  }
+                  return formatCurrency(value as number);
+                }}
+              />
+              <Legend />
+              <Bar yAxisId="left" dataKey="net_earned_premium" fill="#10b981" name="Net EP" />
+              <Bar yAxisId="left" dataKey="net_ultimate" fill="#f59e0b" name="Net Ultimate" />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="loss_ratio"
+                stroke="#ef4444"
+                strokeWidth={3}
+                name="Loss Ratio (%)"
+                dot={{ r: 5, fill: '#ef4444' }}
+              />
+            </ComposedChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
@@ -221,9 +287,9 @@ export function CompanyDetail() {
               <thead>
                 <tr className="border-b">
                   <th className="text-left p-3">Dönem</th>
-                  <th className="text-right p-3">Net Prim</th>
                   <th className="text-right p-3">Net Ödeme</th>
-                  <th className="text-right p-3">Muallak</th>
+                  <th className="text-right p-3">Tahakkuk</th>
+                  <th className="text-right p-3">Raporlanmayan</th>
                   <th className="text-right p-3">Kazanılmış Prim</th>
                   <th className="text-right p-3">Loss Ratio</th>
                 </tr>
@@ -233,10 +299,10 @@ export function CompanyDetail() {
                   <tr key={row.period} className="border-b hover:bg-muted/50">
                     <td className="p-3 font-semibold">{row.period}</td>
                     <td className="text-right p-3 font-mono">
-                      {formatCurrency(row.net_premium)}
+                      {formatCurrency(row.net_payment)}
                     </td>
                     <td className="text-right p-3 font-mono">
-                      {formatCurrency(row.net_payment)}
+                      {formatCurrency(row.net_incurred)}
                     </td>
                     <td className="text-right p-3 font-mono">
                       {formatCurrency(row.net_unreported)}

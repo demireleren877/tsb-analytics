@@ -12,22 +12,14 @@ import {
   Legend,
 } from 'recharts';
 import { TrendingUp, TrendingDown, Award, AlertCircle } from 'lucide-react';
-import { getRankings, getBranches, getPeriods, getDashboard, getLossRatioRankings } from '../lib/api';
+import { getRankings, getBranches, getPeriods, getDashboard } from '../lib/api';
 import { formatCurrency, formatPercent, formatPeriod } from '../lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/Card';
 import { Loading } from '../components/Loading';
 import { MetricCard } from '../components/MetricCard';
 import { useState } from 'react';
 
-const METRICS = [
-  { value: 'net_premium', label: 'Net Prim' },
-  { value: 'net_payment', label: 'Net Ödeme' },
-  { value: 'net_unreported', label: 'Muallak (Raporlanmayan)' },
-  { value: 'net_earned_premium', label: 'Kazanılmış Prim' },
-];
-
 export function Analytics() {
-  const [selectedMetric, setSelectedMetric] = useState('net_premium');
   const [selectedPeriod, setSelectedPeriod] = useState('20253');
   const [selectedBranch, setSelectedBranch] = useState('');
 
@@ -47,14 +39,9 @@ export function Analytics() {
   });
 
   const { data: rankings, isLoading } = useQuery({
-    queryKey: ['rankings', selectedMetric, selectedPeriod, selectedBranch],
+    queryKey: ['rankings', 'net_premium', selectedPeriod, selectedBranch],
     queryFn: () =>
-      getRankings(selectedMetric, selectedPeriod, selectedBranch || undefined, 20),
-  });
-
-  const { data: lossRatioRankings } = useQuery({
-    queryKey: ['lossRatioRankings', selectedPeriod, selectedBranch],
-    queryFn: () => getLossRatioRankings(selectedPeriod, selectedBranch || undefined, 20),
+      getRankings('net_premium', selectedPeriod, selectedBranch || undefined, 20),
   });
 
   if (isLoading) return <Loading />;
@@ -82,22 +69,7 @@ export function Analytics() {
       {/* Filters */}
       <Card>
         <CardContent className="p-6">
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Metrik</label>
-              <select
-                value={selectedMetric}
-                onChange={(e) => setSelectedMetric(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {METRICS.map((metric) => (
-                  <option key={metric.value} value={metric.value}>
-                    {metric.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <label className="text-sm font-medium">Dönem</label>
               <select
@@ -133,7 +105,6 @@ export function Analytics() {
               <label className="text-sm font-medium invisible">Action</label>
               <button
                 onClick={() => {
-                  setSelectedMetric('net_premium');
                   setSelectedPeriod('20253');
                   setSelectedBranch('');
                 }}
@@ -267,9 +238,7 @@ export function Analytics() {
       {/* Rankings Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>
-            {METRICS.find((m) => m.value === selectedMetric)?.label} Sıralaması
-          </CardTitle>
+          <CardTitle>Net Prim Sıralaması</CardTitle>
           <CardDescription>
             {formatPeriod(selectedPeriod)}
             {selectedBranch && ` - Hazine Kodu: ${selectedBranch}`}
@@ -291,33 +260,6 @@ export function Analytics() {
         </CardContent>
       </Card>
 
-      {/* Loss Ratio Performance Rankings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Loss Ratio Performans Sıralaması</CardTitle>
-          <CardDescription>
-            En iyi performans gösteren şirketler (düşük loss ratio daha iyi)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={500}>
-            <BarChart data={lossRatioRankings || []} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" tickFormatter={(value) => `${value.toFixed(1)}%`} />
-              <YAxis dataKey="name" type="category" width={200} fontSize={11} />
-              <Tooltip
-                formatter={(value: any, name: any) => {
-                  if (name === 'Loss Ratio (%)') return `${(value as number).toFixed(2)}%`;
-                  return formatCurrency(value as number);
-                }}
-              />
-              <Legend />
-              <Bar dataKey="loss_ratio" fill="#10b981" name="Loss Ratio (%)" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
       {/* Detailed Rankings Table */}
       <Card>
         <CardHeader>
@@ -333,7 +275,7 @@ export function Analytics() {
                   <th className="text-left p-3">Şirket</th>
                   <th className="text-left p-3">Kod</th>
                   <th className="text-right p-3">
-                    {METRICS.find((m) => m.value === selectedMetric)?.label}
+                    Net Prim
                   </th>
                   <th className="text-right p-3">Pazar Payı</th>
                   <th className="text-right p-3">Kümülatif Pay</th>

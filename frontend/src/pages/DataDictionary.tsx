@@ -53,46 +53,6 @@ const dataDictionary = [
     ],
   },
   {
-    category: 'Hazine Kodları',
-    items: [
-      {
-        term: '701',
-        definition: 'Kaza',
-        formula: '-',
-      },
-      {
-        term: '715',
-        definition: 'Kara Taşıtları (Kasko)',
-        formula: '-',
-      },
-      {
-        term: '716',
-        definition: 'Kara Taşıtları (Trafik)',
-        formula: '-',
-      },
-      {
-        term: '717',
-        definition: 'Yangın ve Doğal Afetler',
-        formula: '-',
-      },
-      {
-        term: '719',
-        definition: 'Genel Zararlar',
-        formula: '-',
-      },
-      {
-        term: '855',
-        definition: 'Genel Sorumluluk',
-        formula: '-',
-      },
-      {
-        term: '856',
-        definition: 'Hukuksal Koruma',
-        formula: '-',
-      },
-    ],
-  },
-  {
     category: 'Dönem Gösterimleri',
     items: [
       {
@@ -155,7 +115,6 @@ export function DataDictionary() {
               <CardDescription>
                 {category.category === 'Finansal Metrikler' && 'Temel finansal ölçümler ve tanımları'}
                 {category.category === 'Hesaplanmış Göstergeler' && 'Platform tarafından hesaplanan performans metrikleri'}
-                {category.category === 'Hazine Kodları' && 'Türkiye Sigorta Birliği branş kodları'}
                 {category.category === 'Dönem Gösterimleri' && 'Zaman bazlı gösterimler ve karşılaştırmalar'}
                 {category.category === 'Performans Göstergeleri' && 'Şirket ve pazar performans ölçütleri'}
               </CardDescription>
