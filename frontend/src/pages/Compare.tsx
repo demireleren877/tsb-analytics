@@ -95,7 +95,14 @@ export function Compare() {
 
   // Performance radar chart data
   const radarData = comparison?.map((company) => {
-    const lossRatio = (Math.abs(company.totals.net_payment) / company.totals.net_premium) * 100;
+    const netUltimate = Math.abs(company.totals.net_payment)
+                      + Math.abs(company.totals.net_incurred)
+                      + Math.abs(company.totals.net_unreported)
+                      - Math.abs(company.totals.pye_net_incurred)
+                      - Math.abs(company.totals.pye_net_unreported);
+    const lossRatio = company.totals.net_earned_premium > 0
+      ? (netUltimate / company.totals.net_earned_premium) * 100
+      : 0;
     const marketShare = (company.totals.net_premium / totalMarketPremium) * 100;
     return {
       company: company.name.substring(0, 15),
@@ -435,8 +442,15 @@ export function Compare() {
                       </thead>
                       <tbody>
                         {comparison?.map((company, index) => {
-                          const lossRatio =
-                            (Math.abs(company.totals.net_payment) / company.totals.net_premium) * 100;
+                          // Calculate Net Ultimate with correct formula
+                          const netUltimate = Math.abs(company.totals.net_payment)
+                                            + Math.abs(company.totals.net_incurred)
+                                            + Math.abs(company.totals.net_unreported)
+                                            - Math.abs(company.totals.pye_net_incurred)
+                                            - Math.abs(company.totals.pye_net_unreported);
+                          const lossRatio = company.totals.net_earned_premium > 0
+                            ? (netUltimate / company.totals.net_earned_premium) * 100
+                            : 0;
                           const marketShare = (company.totals.net_premium / totalMarketPremium) * 100;
                           return (
                             <tr key={company.id} className="border-b hover:bg-muted/50">

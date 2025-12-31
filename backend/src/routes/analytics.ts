@@ -226,4 +226,107 @@ analytics.get('/growth', async (c) => {
   }
 });
 
+// GET /api/analytics/loss-ratio-rankings - Loss Ratio bazlı performans sıralaması
+analytics.get('/loss-ratio-rankings', async (c) => {
+  try {
+    const { period, branch, limit = '20' } = c.req.query();
+    const currentPeriod = period || '20253';
+
+    // Calculate previous year end (Q4 of previous year)
+    const year = parseInt(currentPeriod.substring(0, 4));
+    const pyePeriod = `${year - 1}4`;
+
+    // Get current period data with PYE data
+    let query = `
+      SELECT
+        c.id,
+        c.name,
+        c.code,
+        SUM(fd.net_payment) as net_payment,
+        SUM(fd.net_incurred) as net_incurred,
+        SUM(fd.net_unreported) as net_unreported,
+        SUM(fd.net_earned_premium) as net_earned_premium
+      FROM financial_data fd
+      JOIN companies c ON fd.company_id = c.id
+      WHERE fd.period = ?
+    `;
+    const params: any[] = [currentPeriod];
+
+    if (branch) {
+      query += ' AND fd.branch_code = ?';
+      params.push(branch);
+    }
+
+    query += ' GROUP BY c.id, c.name, c.code';
+    const currentResult = await c.env.DB.prepare(query).bind(...params).all();
+
+    // Get PYE data
+    let pyeQuery = `
+      SELECT
+        c.id,
+        SUM(fd.net_incurred) as pye_net_incurred,
+        SUM(fd.net_unreported) as pye_net_unreported
+      FROM financial_data fd
+      JOIN companies c ON fd.company_id = c.id
+      WHERE fd.period = ?
+    `;
+    const pyeParams: any[] = [pyePeriod];
+
+    if (branch) {
+      pyeQuery += ' AND fd.branch_code = ?';
+      pyeParams.push(branch);
+    }
+
+    pyeQuery += ' GROUP BY c.id';
+    const pyeResult = await c.env.DB.prepare(pyeQuery).bind(...pyeParams).all();
+
+    // Create PYE lookup
+    const pyeData: any = {};
+    pyeResult.results?.forEach((row: any) => {
+      pyeData[row.id] = {
+        pye_net_incurred: row.pye_net_incurred || 0,
+        pye_net_unreported: row.pye_net_unreported || 0,
+      };
+    });
+
+    // Calculate loss ratios
+    const rankings = currentResult.results?.map((row: any) => {
+      const pye = pyeData[row.id] || { pye_net_incurred: 0, pye_net_unreported: 0 };
+
+      // Net Ultimate = Net Ödeme + Net Tahakkuk + Net Raporlanmayan - PYE_Net Tahakkuk - PYE_Net Raporlanmayan
+      const netUltimate = Math.abs(row.net_payment)
+                        + Math.abs(row.net_incurred)
+                        + Math.abs(row.net_unreported)
+                        - Math.abs(pye.pye_net_incurred)
+                        - Math.abs(pye.pye_net_unreported);
+
+      const lossRatio = row.net_earned_premium > 0
+        ? (netUltimate / row.net_earned_premium) * 100
+        : 0;
+
+      return {
+        id: row.id,
+        name: row.name,
+        code: row.code,
+        net_ultimate: netUltimate,
+        net_earned_premium: row.net_earned_premium,
+        loss_ratio: parseFloat(lossRatio.toFixed(2)),
+      };
+    }).sort((a: any, b: any) => a.loss_ratio - b.loss_ratio) // Sort by loss ratio ASC (lower is better)
+      .slice(0, parseInt(limit));
+
+    return c.json({
+      success: true,
+      data: rankings,
+      period: currentPeriod,
+      pyePeriod: pyePeriod,
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message,
+    }, 500);
+  }
+});
+
 export { analytics };

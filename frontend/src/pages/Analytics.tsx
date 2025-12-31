@@ -12,7 +12,7 @@ import {
   Legend,
 } from 'recharts';
 import { TrendingUp, TrendingDown, Award, AlertCircle } from 'lucide-react';
-import { getRankings, getBranches, getPeriods, getDashboard } from '../lib/api';
+import { getRankings, getBranches, getPeriods, getDashboard, getLossRatioRankings } from '../lib/api';
 import { formatCurrency, formatPercent, formatPeriod } from '../lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/Card';
 import { Loading } from '../components/Loading';
@@ -50,6 +50,11 @@ export function Analytics() {
     queryKey: ['rankings', selectedMetric, selectedPeriod, selectedBranch],
     queryFn: () =>
       getRankings(selectedMetric, selectedPeriod, selectedBranch || undefined, 20),
+  });
+
+  const { data: lossRatioRankings } = useQuery({
+    queryKey: ['lossRatioRankings', selectedPeriod, selectedBranch],
+    queryFn: () => getLossRatioRankings(selectedPeriod, selectedBranch || undefined, 20),
   });
 
   if (isLoading) return <Loading />;
@@ -281,6 +286,33 @@ export function Analytics() {
               <YAxis dataKey="name" type="category" width={200} fontSize={11} />
               <Tooltip formatter={(value: any) => formatCurrency(Math.abs(value))} />
               <Bar dataKey="total" fill="#3b82f6" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Loss Ratio Performance Rankings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Loss Ratio Performans Sıralaması</CardTitle>
+          <CardDescription>
+            En iyi performans gösteren şirketler (düşük loss ratio daha iyi)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={500}>
+            <BarChart data={lossRatioRankings || []} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" tickFormatter={(value) => `${value.toFixed(1)}%`} />
+              <YAxis dataKey="name" type="category" width={200} fontSize={11} />
+              <Tooltip
+                formatter={(value: any, name: any) => {
+                  if (name === 'Loss Ratio (%)') return `${(value as number).toFixed(2)}%`;
+                  return formatCurrency(value as number);
+                }}
+              />
+              <Legend />
+              <Bar dataKey="loss_ratio" fill="#10b981" name="Loss Ratio (%)" />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

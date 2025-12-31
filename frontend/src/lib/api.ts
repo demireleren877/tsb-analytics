@@ -77,6 +77,20 @@ export const getRankings = async (
   return response.data.data;
 };
 
+export const getLossRatioRankings = async (
+  period?: string,
+  branch?: string,
+  limit: number = 20
+): Promise<any[]> => {
+  const params = new URLSearchParams();
+  params.append('limit', limit.toString());
+  if (period) params.append('period', period);
+  if (branch) params.append('branch', branch);
+
+  const response = await api.get(`/api/analytics/loss-ratio-rankings?${params.toString()}`);
+  return response.data.data;
+};
+
 export const getTrends = async (
   company: number,
   metric: string = 'net_premium',
