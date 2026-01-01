@@ -314,7 +314,10 @@ analytics.get('/company-performance', async (c) => {
           SUM(net_payment) as net_payment,
           SUM(net_incurred) as net_incurred,
           SUM(net_unreported) as net_unreported,
-          SUM(net_earned_premium) as net_earned_premium
+          SUM(net_earned_premium) as net_earned_premium,
+          SUM(discount_provision) as discount_provision,
+          SUM(incurred_claims) as gross_incurred,
+          SUM(unreported_claims) as gross_unreported
         FROM financial_data
         WHERE company_id = ? AND period = ?
       `;
@@ -344,6 +347,12 @@ analytics.get('/company-performance', async (c) => {
 
       const pyeData = await c.env.DB.prepare(pyeQuery).bind(...pyeParams).first();
 
+      // Calculate discount rate
+      const grossTotal = Math.abs(currentData?.gross_incurred || 0) + Math.abs(currentData?.gross_unreported || 0);
+      const discountRate = grossTotal > 0
+        ? parseFloat(((Math.abs(currentData?.discount_provision || 0) / grossTotal) * 100).toFixed(2))
+        : 0;
+
       performanceData.push({
         period: currentPeriod,
         net_premium: currentData?.net_premium || 0,
@@ -353,6 +362,7 @@ analytics.get('/company-performance', async (c) => {
         net_earned_premium: currentData?.net_earned_premium || 0,
         pye_net_incurred: pyeData?.pye_net_incurred || 0,
         pye_net_unreported: pyeData?.pye_net_unreported || 0,
+        discount_rate: discountRate,
       });
     }
 

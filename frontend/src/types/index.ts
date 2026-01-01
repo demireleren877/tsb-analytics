@@ -139,4 +139,5 @@ export interface CompanyPerformanceData {
   net_earned_premium: number;
   pye_net_incurred: number;
   pye_net_unreported: number;
+  discount_rate: number;
 }

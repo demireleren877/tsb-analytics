@@ -72,7 +72,7 @@ export function CompanyDetail() {
       net_earned_premium: netEP,
       net_ultimate: netUltimate,
       loss_ratio: lossRatio,
-      discount_rate: (item as any).discount_rate || 0,
+      discount_rate: item.discount_rate || 0,
     };
   });
 

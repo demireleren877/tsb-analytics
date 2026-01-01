@@ -47,13 +47,24 @@ export function Compare() {
     queryFn: getBranches,
   });
 
-  const effectivePeriod = selectedPeriods.length > 0 ? selectedPeriods[0] : selectedPeriod;
+  const effectivePeriods = selectedPeriods.length > 0 ? selectedPeriods : [selectedPeriod];
 
-  const { data: comparison, isLoading } = useQuery({
-    queryKey: ['comparison', selectedCompanies, effectivePeriod, selectedBranch],
-    queryFn: () => compareCompanies(selectedCompanies, effectivePeriod, selectedBranch || undefined),
-    enabled: selectedCompanies.length >= 2,
+  // Fetch data for all selected periods
+  const { data: comparisonByPeriod, isLoading } = useQuery({
+    queryKey: ['comparison-multi-period', selectedCompanies, effectivePeriods, selectedBranch],
+    queryFn: async () => {
+      const results = await Promise.all(
+        effectivePeriods.map((period) =>
+          compareCompanies(selectedCompanies, period, selectedBranch || undefined)
+        )
+      );
+      return results;
+    },
+    enabled: selectedCompanies.length >= 2 && effectivePeriods.length > 0,
   });
+
+  // For single period compatibility, get first period data
+  const comparison = comparisonByPeriod?.[0];
 
   const toggleCompany = (companyId: number) => {
     setSelectedCompanies((prev) =>
@@ -64,6 +75,19 @@ export function Compare() {
         : prev
     );
   };
+
+  // Create period-based chart data (periods on X-axis, companies as bars)
+  const periodChartData = comparisonByPeriod?.map((periodData, periodIndex) => {
+    const periodObj: any = {
+      period: formatPeriod(effectivePeriods[periodIndex]),
+    };
+
+    periodData?.forEach((company) => {
+      periodObj[company.name.substring(0, 15)] = company.totals.discount_rate;
+    });
+
+    return periodObj;
+  }) || [];
 
   const chartData = comparison?.map((company) => {
     // Calculate Net Ultimate using correct formula:
@@ -407,24 +431,37 @@ export function Compare() {
                 </CardContent>
               </Card>
 
-              {/* Discount Rate Comparison */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>İskonto Oranı Karşılaştırması</CardTitle>
-                  <CardDescription>Nakit akışlarından kaynaklanan iskonto oranları</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} fontSize={11} />
-                      <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
-                      <Tooltip formatter={(value: any) => `${(value as number).toFixed(2)}%`} />
-                      <Bar dataKey="discount_rate" fill="#3b82f6" name="İskonto Oranı (%)" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+              {/* Discount Rate Comparison - Period Based */}
+              {periodChartData.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>İskonto Oranı Karşılaştırması (Dönem Bazlı)</CardTitle>
+                    <CardDescription>Seçili dönemler ve şirketler için iskonto oranları</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={350}>
+                      <BarChart data={periodChartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="period" angle={-45} textAnchor="end" height={80} fontSize={11} />
+                        <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
+                        <Tooltip formatter={(value: any) => `${(value as number).toFixed(2)}%`} />
+                        <Legend />
+                        {comparison?.map((company, idx) => {
+                          const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16'];
+                          return (
+                            <Bar
+                              key={company.id}
+                              dataKey={company.name.substring(0, 15)}
+                              fill={colors[idx % colors.length]}
+                              name={company.name}
+                            />
+                          );
+                        })}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Market Share */}
               <Card>
