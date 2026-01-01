@@ -9,7 +9,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-  
   Line,
   RadarChart,
   PolarGrid,
@@ -18,20 +17,19 @@ import {
   Radar,
   ComposedChart,
 } from 'recharts';
-import { GitCompare, X, TrendingUp } from 'lucide-react';
+import { GitCompare, TrendingUp } from 'lucide-react';
 import { getCompanies, compareCompanies, getPeriods, getBranches } from '../lib/api';
 import { formatCurrency, formatPercent, formatPeriod } from '../lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/Card';
 import { Loading } from '../components/Loading';
+import { MultiSelect } from '../components/MultiSelect';
 import { useStore } from '../store/useStore';
 
 export function Compare() {
   const { selectedPeriod } = useStore();
-  const [selectedCompanies, setSelectedCompanies] = useState<number[]>([]);
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([]);
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
-  const [showCompanySelector, setShowCompanySelector] = useState(false);
-  const [showPeriodSelector, setShowPeriodSelector] = useState(false);
-  const [selectedBranch, setSelectedBranch] = useState('');
+  const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
 
   const { data: companies } = useQuery({
     queryKey: ['companies'],
@@ -48,15 +46,18 @@ export function Compare() {
     queryFn: getBranches,
   });
 
+  // Convert string IDs to numbers
+  const selectedCompanies = selectedCompanyIds.map((id) => parseInt(id));
   const effectivePeriods = selectedPeriods.length > 0 ? selectedPeriods : [selectedPeriod];
+  const effectiveBranch = selectedBranches.length > 0 ? selectedBranches[0] : undefined;
 
   // Fetch data for all selected periods
   const { data: comparisonByPeriod, isLoading } = useQuery({
-    queryKey: ['comparison-multi-period', selectedCompanies, effectivePeriods, selectedBranch],
+    queryKey: ['comparison-multi-period', selectedCompanies, effectivePeriods, effectiveBranch],
     queryFn: async () => {
       const results = await Promise.all(
         effectivePeriods.map((period) =>
-          compareCompanies(selectedCompanies, period, selectedBranch || undefined)
+          compareCompanies(selectedCompanies, period, effectiveBranch)
         )
       );
       return results;
@@ -67,19 +68,25 @@ export function Compare() {
   // For single period compatibility, get first period data
   const comparison = comparisonByPeriod?.[0];
 
-  const toggleCompany = (companyId: number) => {
-    setSelectedCompanies((prev) =>
-      prev.includes(companyId)
-        ? prev.filter((id) => id !== companyId)
-        : prev.length < 10
-        ? [...prev, companyId]
-        : prev
-    );
-  };
+  // Prepare options for MultiSelect
+  const periodOptions = periods?.map((p) => ({
+    value: p.period,
+    label: formatPeriod(p.period),
+  })) || [];
+
+  const branchOptions = branches?.map((b) => ({
+    value: b.code,
+    label: `${b.code} - ${b.name}`,
+  })) || [];
+
+  const companyOptions = companies?.map((c) => ({
+    value: c.id.toString(),
+    label: c.name,
+  })) || [];
 
   // Create company-based chart data (companies on X-axis, periods as bars)
   const companyDiscountChartData = comparison?.map((company) => {
-    const companyObj: any = {
+    const companyObj: Record<string, string | number> = {
       name: company.name.substring(0, 15),
       fullName: company.name,
     };
@@ -153,156 +160,37 @@ export function Compare() {
       <Card>
         <CardContent className="p-6">
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Dönem (Çoklu Seçim)</label>
-              <div className="relative">
-                <button
-                  onClick={() => setShowPeriodSelector(!showPeriodSelector)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-left hover:bg-accent flex items-center justify-between"
-                >
-                  <span>
-                    {selectedPeriods.length > 0
-                      ? `${selectedPeriods.length} dönem seçili`
-                      : 'Dönem seçin...'}
-                  </span>
-                  <span className="text-xs">▼</span>
-                </button>
-                {showPeriodSelector && (
-                  <div className="absolute z-50 w-full mt-1 border rounded-md bg-background shadow-lg max-h-48 overflow-y-auto">
-                    {periods?.map((period) => (
-                      <label
-                        key={period.period}
-                        className="flex items-center space-x-2 cursor-pointer hover:bg-accent p-2 border-b last:border-b-0"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedPeriods.includes(period.period)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedPeriods((prev) => [...prev, period.period]);
-                            } else {
-                              setSelectedPeriods((prev) =>
-                                prev.filter((p) => p !== period.period)
-                              );
-                            }
-                          }}
-                          className="h-4 w-4 rounded border-gray-300"
-                        />
-                        <span className="text-sm flex-1">{formatPeriod(period.period)}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <MultiSelect
+              label="Dönem"
+              options={periodOptions}
+              selected={selectedPeriods}
+              onChange={setSelectedPeriods}
+              placeholder="Dönem seçin..."
+              allLabel="Tüm Dönemler"
+              showAllOption={false}
+            />
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Hazine Kodu</label>
-              <select
-                value={selectedBranch}
-                onChange={(e) => setSelectedBranch(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="">Tüm Branşlar</option>
-                {branches?.map((branch) => (
-                  <option key={branch.code} value={branch.code}>
-                    {branch.code}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <MultiSelect
+              label="Hazine Kodu"
+              options={branchOptions}
+              selected={selectedBranches}
+              onChange={setSelectedBranches}
+              placeholder="Tüm Branşlar"
+              allLabel="Tüm Branşlar"
+            />
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Şirketler (Karşılaştırma için)</label>
-              <div className="relative">
-                <button
-                  onClick={() => setShowCompanySelector(!showCompanySelector)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-left hover:bg-accent flex items-center justify-between"
-                >
-                  <span>
-                    {selectedCompanies.length > 0
-                      ? `${selectedCompanies.length} şirket seçili`
-                      : 'Şirket seçin...'}
-                  </span>
-                  <span className="text-xs">▼</span>
-                </button>
-                {showCompanySelector && (
-                  <div className="absolute z-50 w-full mt-1 border rounded-md bg-background shadow-lg max-h-48 overflow-y-auto">
-                    {companies?.map((company) => (
-                      <label
-                        key={company.id}
-                        className="flex items-center space-x-2 cursor-pointer hover:bg-accent p-2 border-b last:border-b-0"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedCompanies.includes(company.id)}
-                          onChange={() => toggleCompany(company.id)}
-                          disabled={!selectedCompanies.includes(company.id) && selectedCompanies.length >= 10}
-                          className="h-4 w-4 rounded border-gray-300"
-                        />
-                        <span className="text-sm flex-1">{company.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <MultiSelect
+              label="Şirketler (max 10)"
+              options={companyOptions}
+              selected={selectedCompanyIds}
+              onChange={(ids) => setSelectedCompanyIds(ids.slice(0, 10))}
+              placeholder="En az 2 şirket seçin..."
+              allLabel="Tüm Şirketler"
+              showAllOption={false}
+            />
           </div>
         </CardContent>
       </Card>
-
-      {/* Selected Items Display */}
-      {(selectedCompanies.length > 0 || selectedPeriods.length > 0) && (
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            {selectedPeriods.length > 0 && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Seçili Dönemler:</p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedPeriods.map((period) => (
-                    <div
-                      key={period}
-                      className="inline-flex items-center space-x-2 rounded-md bg-blue-100 dark:bg-blue-900/30 px-3 py-1.5 text-sm"
-                    >
-                      <span>{formatPeriod(period)}</span>
-                      <button
-                        onClick={() => setSelectedPeriods((prev) => prev.filter((p) => p !== period))}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {selectedCompanies.length > 0 && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Seçili Şirketler:</p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedCompanies.map((companyId) => {
-                    const company = companies?.find((c) => c.id === companyId);
-                    return (
-                      <div
-                        key={companyId}
-                        className="inline-flex items-center space-x-2 rounded-md bg-primary/10 px-3 py-1.5 text-sm"
-                      >
-                        <span>{company?.name}</span>
-                        <button
-                          onClick={() => toggleCompany(companyId)}
-                          className="text-primary hover:text-primary/70"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Comparison Results */}
       {selectedCompanies.length >= 2 && (
@@ -393,7 +281,7 @@ export function Compare() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} fontSize={11} />
                       <YAxis tickFormatter={(value) => `${(value / 1_000_000_000).toFixed(1)}B`} />
-                      <Tooltip formatter={(value: any) => formatCurrency(value as number)} />
+                      <Tooltip formatter={(value) => formatCurrency(value as number)} />
                       <Legend />
                       <Bar dataKey="net_premium" fill="#3b82f6" name="Net Prim" />
                       <Bar dataKey="net_payment" fill="#ef4444" name="Net Ödeme" />
@@ -425,7 +313,7 @@ export function Compare() {
                         tickFormatter={(value) => `${value.toFixed(0)}%`}
                       />
                       <Tooltip
-                        formatter={(value: any, name: any) => {
+                        formatter={(value, name) => {
                           if (name === 'Loss Ratio (%)') {
                             return `${(value as number).toFixed(2)}%`;
                           }
@@ -463,10 +351,10 @@ export function Compare() {
                         <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} fontSize={11} />
                         <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
                         <Tooltip
-                          formatter={(value: any) => `${(value as number).toFixed(2)}%`}
+                          formatter={(value) => `${(value as number).toFixed(2)}%`}
                           labelFormatter={(label) => {
                             const company = companyDiscountChartData.find((c) => c.name === label);
-                            return company?.fullName || label;
+                            return (company?.fullName as string) || label;
                           }}
                         />
                         <Legend />

@@ -17,11 +17,12 @@ import { formatCurrency, formatPercent, formatPeriod } from '../lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/Card';
 import { Loading } from '../components/Loading';
 import { MetricCard } from '../components/MetricCard';
+import { MultiSelect } from '../components/MultiSelect';
 import { useState } from 'react';
 
 export function Analytics() {
-  const [selectedPeriod, setSelectedPeriod] = useState('20253');
-  const [selectedBranch, setSelectedBranch] = useState('');
+  const [selectedPeriods, setSelectedPeriods] = useState<string[]>(['20253']);
+  const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
 
   const { data: periods } = useQuery({
     queryKey: ['periods'],
@@ -33,16 +34,31 @@ export function Analytics() {
     queryFn: getBranches,
   });
 
+  // Use first selected period for API call
+  const effectivePeriod = selectedPeriods[0] || '20253';
+  const effectiveBranch = selectedBranches.length > 0 ? selectedBranches[0] : undefined;
+
   const { data: dashboard } = useQuery({
-    queryKey: ['dashboard', selectedPeriod, selectedBranch],
-    queryFn: () => getDashboard(selectedPeriod, selectedBranch || undefined),
+    queryKey: ['dashboard', effectivePeriod, effectiveBranch],
+    queryFn: () => getDashboard(effectivePeriod, effectiveBranch),
   });
 
   const { data: rankings, isLoading } = useQuery({
-    queryKey: ['rankings', 'net_premium', selectedPeriod, selectedBranch],
+    queryKey: ['rankings', 'net_premium', effectivePeriod, effectiveBranch],
     queryFn: () =>
-      getRankings('net_premium', selectedPeriod, selectedBranch || undefined, 20),
+      getRankings('net_premium', effectivePeriod, effectiveBranch, 20),
   });
+
+  // Prepare options for MultiSelect
+  const periodOptions = periods?.map((p) => ({
+    value: p.period,
+    label: formatPeriod(p.period),
+  })) || [];
+
+  const branchOptions = branches?.map((b) => ({
+    value: b.code,
+    label: `${b.code} - ${b.name}`,
+  })) || [];
 
   if (isLoading) return <Loading />;
 
@@ -51,13 +67,22 @@ export function Analytics() {
   const totalPremium = rankings?.reduce((sum, c) => sum + c.total, 0) || 1;
   const concentration = (top5Premium / totalPremium) * 100;
 
-  // Branch performance data
-  const branchData = dashboard?.branchDistribution.map((b) => ({
-    code: b.code,
-    premium: b.total_premium,
-    claims: Math.abs(b.total_claims),
-    loss_ratio: (Math.abs(b.total_claims) / b.total_premium) * 100,
-  }));
+  // Filter branch data based on selection
+  const branchData = selectedBranches.length > 0
+    ? dashboard?.branchDistribution
+        .filter((b) => selectedBranches.includes(b.code))
+        .map((b) => ({
+          code: b.code,
+          premium: b.total_premium,
+          claims: Math.abs(b.total_claims),
+          loss_ratio: (Math.abs(b.total_claims) / b.total_premium) * 100,
+        }))
+    : dashboard?.branchDistribution.map((b) => ({
+        code: b.code,
+        premium: b.total_premium,
+        claims: Math.abs(b.total_claims),
+        loss_ratio: (Math.abs(b.total_claims) / b.total_premium) * 100,
+      }));
 
   return (
     <div className="space-y-6">
@@ -70,43 +95,31 @@ export function Analytics() {
       <Card>
         <CardContent className="p-6">
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Dönem</label>
-              <select
-                value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {periods?.map((period) => (
-                  <option key={period.period} value={period.period}>
-                    {formatPeriod(period.period)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <MultiSelect
+              label="Dönem"
+              options={periodOptions}
+              selected={selectedPeriods}
+              onChange={setSelectedPeriods}
+              placeholder="Dönem seçin..."
+              allLabel="Tüm Dönemler"
+              showAllOption={false}
+            />
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Hazine Kodu</label>
-              <select
-                value={selectedBranch}
-                onChange={(e) => setSelectedBranch(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="">Tüm Branşlar</option>
-                {branches?.map((branch) => (
-                  <option key={branch.code} value={branch.code}>
-                    {branch.code}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <MultiSelect
+              label="Hazine Kodu"
+              options={branchOptions}
+              selected={selectedBranches}
+              onChange={setSelectedBranches}
+              placeholder="Tüm Branşlar"
+              allLabel="Tüm Branşlar"
+            />
 
             <div className="space-y-2">
               <label className="text-sm font-medium invisible">Action</label>
               <button
                 onClick={() => {
-                  setSelectedPeriod('20253');
-                  setSelectedBranch('');
+                  setSelectedPeriods(['20253']);
+                  setSelectedBranches([]);
                 }}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent"
               >
@@ -154,7 +167,7 @@ export function Analytics() {
         <Card>
           <CardHeader>
             <CardTitle>Hazine Kodu Bazında Net Prim</CardTitle>
-            <CardDescription>{formatPeriod(selectedPeriod)}</CardDescription>
+            <CardDescription>{formatPeriod(effectivePeriod)}</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -162,7 +175,7 @@ export function Analytics() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="code" />
                 <YAxis tickFormatter={(value) => `${(value / 1_000_000_000).toFixed(1)}B`} />
-                <Tooltip formatter={(value: any) => formatCurrency(value as number)} />
+                <Tooltip formatter={(value) => formatCurrency(value as number)} />
                 <Bar dataKey="premium" fill="#3b82f6" name="Net Prim" />
               </BarChart>
             </ResponsiveContainer>
@@ -180,7 +193,7 @@ export function Analytics() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="code" />
                 <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
-                <Tooltip formatter={(value: any) => formatPercent(value as number)} />
+                <Tooltip formatter={(value) => formatPercent(value as number)} />
                 <Bar dataKey="loss_ratio" fill="#f59e0b" name="Loss Ratio (%)" />
               </BarChart>
             </ResponsiveContainer>
@@ -212,7 +225,7 @@ export function Analytics() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="rank" label={{ value: 'Sıralama', position: 'insideBottom', offset: -5 }} />
               <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
-              <Tooltip formatter={(value: any) => `${(value as number).toFixed(2)}%`} />
+              <Tooltip formatter={(value) => `${(value as number).toFixed(2)}%`} />
               <Legend />
               <Line
                 type="monotone"
@@ -240,8 +253,8 @@ export function Analytics() {
         <CardHeader>
           <CardTitle>Net Prim Sıralaması</CardTitle>
           <CardDescription>
-            {formatPeriod(selectedPeriod)}
-            {selectedBranch && ` - Hazine Kodu: ${selectedBranch}`}
+            {formatPeriod(effectivePeriod)}
+            {selectedBranches.length > 0 && ` - Hazine Kodu: ${selectedBranches.join(', ')}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -253,7 +266,7 @@ export function Analytics() {
                 tickFormatter={(value) => `${(Math.abs(value) / 1_000_000_000).toFixed(1)}B`}
               />
               <YAxis dataKey="name" type="category" width={200} fontSize={11} />
-              <Tooltip formatter={(value: any) => formatCurrency(Math.abs(value))} />
+              <Tooltip formatter={(value) => formatCurrency(Math.abs(value as number))} />
               <Bar dataKey="total" fill="#3b82f6" />
             </BarChart>
           </ResponsiveContainer>

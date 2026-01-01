@@ -20,11 +20,12 @@ import { formatCurrency, formatPercent, formatPeriod } from '../lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/Card';
 import { MetricCard } from '../components/MetricCard';
 import { Loading } from '../components/Loading';
+import { MultiSelect } from '../components/MultiSelect';
 
 export function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
   const companyId = parseInt(id || '0');
-  const [selectedBranch, setSelectedBranch] = useState('');
+  const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
 
   const { data: company, isLoading: companyLoading } = useQuery({
     queryKey: ['company', companyId],
@@ -36,18 +37,27 @@ export function CompanyDetail() {
     queryFn: getBranches,
   });
 
+  // Get effective branch (first selected or undefined for all)
+  const effectiveBranch = selectedBranches.length > 0 ? selectedBranches[0] : undefined;
+
   // Get performance data with PYE
   const { data: performanceData } = useQuery({
-    queryKey: ['performance', companyId, selectedBranch],
-    queryFn: () => getCompanyPerformance(companyId, 8, selectedBranch || undefined),
+    queryKey: ['performance', companyId, effectiveBranch],
+    queryFn: () => getCompanyPerformance(companyId, 8, effectiveBranch),
     enabled: !!companyId,
   });
 
   const { data: growth } = useQuery({
-    queryKey: ['growth', companyId, selectedBranch],
-    queryFn: () => getGrowth(companyId, 'net_premium', selectedBranch || undefined),
+    queryKey: ['growth', companyId, effectiveBranch],
+    queryFn: () => getGrowth(companyId, 'net_premium', effectiveBranch),
     enabled: !!companyId,
   });
+
+  // Prepare branch options for MultiSelect
+  const branchOptions = branches?.map((b) => ({
+    value: b.code,
+    label: `${b.code} - ${b.name}`,
+  })) || [];
 
   if (companyLoading) return <Loading />;
 
@@ -92,20 +102,15 @@ export function CompanyDetail() {
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center gap-4">
-            <label className="text-sm font-medium">Hazine Kodu:</label>
-            <select
-              value={selectedBranch}
-              onChange={(e) => setSelectedBranch(e.target.value)}
-              className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <option value="">Tüm Branşlar</option>
-              {branches?.map((branch) => (
-                <option key={branch.code} value={branch.code}>
-                  {branch.code} - {branch.name}
-                </option>
-              ))}
-            </select>
+          <div className="max-w-md">
+            <MultiSelect
+              label="Hazine Kodu"
+              options={branchOptions}
+              selected={selectedBranches}
+              onChange={setSelectedBranches}
+              placeholder="Tüm Branşlar"
+              allLabel="Tüm Branşlar"
+            />
           </div>
         </CardContent>
       </Card>
@@ -155,7 +160,7 @@ export function CompanyDetail() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="period" />
               <YAxis tickFormatter={(value) => `${(value / 1_000_000_000).toFixed(1)}B`} />
-              <Tooltip formatter={(value: any) => formatCurrency(value as number)} />
+              <Tooltip formatter={(value) => formatCurrency(value as number)} />
               <Legend />
               <Line
                 type="monotone"
@@ -208,7 +213,7 @@ export function CompanyDetail() {
               <YAxis yAxisId="left" tickFormatter={(value) => `${(value / 1_000_000_000).toFixed(1)}B`} />
               <YAxis yAxisId="right" orientation="right" tickFormatter={(value) => `${value.toFixed(0)}%`} />
               <Tooltip
-                formatter={(value: any, name: any) => {
+                formatter={(value, name) => {
                   if (name === 'Loss Ratio (%)') {
                     return `${(value as number).toFixed(2)}%`;
                   }
@@ -244,7 +249,7 @@ export function CompanyDetail() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="period" />
               <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
-              <Tooltip formatter={(value: any) => `${(value as number).toFixed(2)}%`} />
+              <Tooltip formatter={(value) => `${(value as number).toFixed(2)}%`} />
               <Legend />
               <Line
                 type="monotone"

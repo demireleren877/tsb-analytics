@@ -348,12 +348,9 @@ analytics.get('/company-performance', async (c) => {
       const pyeData = await c.env.DB.prepare(pyeQuery).bind(...pyeParams).first();
 
       // Calculate discount rate
-      const grossIncurred = (currentData?.gross_incurred as number) || 0;
-      const grossUnreported = (currentData?.gross_unreported as number) || 0;
-      const discountProvision = (currentData?.discount_provision as number) || 0;
-      const grossTotal = Math.abs(grossIncurred) + Math.abs(grossUnreported);
+      const grossTotal = Math.abs(currentData?.gross_incurred || 0) + Math.abs(currentData?.gross_unreported || 0);
       const discountRate = grossTotal > 0
-        ? parseFloat(((Math.abs(discountProvision) / grossTotal) * 100).toFixed(2))
+        ? parseFloat(((Math.abs(currentData?.discount_provision || 0) / grossTotal) * 100).toFixed(2))
         : 0;
 
       performanceData.push({

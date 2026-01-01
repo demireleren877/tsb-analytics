@@ -9,18 +9,18 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { TrendingDown, TrendingUp, DollarSign, AlertTriangle, X } from 'lucide-react';
+import { TrendingDown, TrendingUp, DollarSign, AlertTriangle } from 'lucide-react';
 import { getDashboard, getPeriods, getBranches, getCompanies } from '../lib/api';
 import { formatCurrency, formatPercent, formatPeriod } from '../lib/utils';
 import { MetricCard } from '../components/MetricCard';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/Card';
 import { Loading } from '../components/Loading';
+import { MultiSelect } from '../components/MultiSelect';
 
 export function Dashboard() {
-  const [selectedPeriod, setSelectedPeriod] = useState('20253');
-  const [selectedBranch, setSelectedBranch] = useState('');
-  const [selectedCompanies, setSelectedCompanies] = useState<number[]>([]);
-  const [showCompanySelector, setShowCompanySelector] = useState(false);
+  const [selectedPeriods, setSelectedPeriods] = useState<string[]>(['20253']);
+  const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([]);
 
   const { data: periods } = useQuery({
     queryKey: ['periods'],
@@ -37,29 +37,40 @@ export function Dashboard() {
     queryFn: () => getCompanies(),
   });
 
+  // Use first selected period for API call (API currently supports single period)
+  const effectivePeriod = selectedPeriods[0] || '20253';
+  // Use first selected branch or empty for all
+  const effectiveBranch = selectedBranches.length > 0 ? selectedBranches[0] : undefined;
+  // Convert string IDs to numbers
+  const effectiveCompanyIds = selectedCompanyIds.map((id) => parseInt(id));
+
   const { data: dashboard, isLoading } = useQuery({
-    queryKey: ['dashboard', selectedPeriod, selectedBranch, selectedCompanies],
-    queryFn: () => getDashboard(selectedPeriod, selectedBranch || undefined, selectedCompanies.length > 0 ? selectedCompanies : undefined),
+    queryKey: ['dashboard', effectivePeriod, effectiveBranch, effectiveCompanyIds],
+    queryFn: () => getDashboard(effectivePeriod, effectiveBranch, effectiveCompanyIds.length > 0 ? effectiveCompanyIds : undefined),
   });
-
-  const toggleCompany = (companyId: number) => {
-    setSelectedCompanies((prev) =>
-      prev.includes(companyId)
-        ? prev.filter((id) => id !== companyId)
-        : [...prev, companyId]
-    );
-  };
-
-  const removeCompany = (companyId: number) => {
-    setSelectedCompanies((prev) => prev.filter((id) => id !== companyId));
-  };
 
   if (isLoading) return <Loading />;
 
   // Filter data based on selections
-  const filteredBranchData = selectedBranch
-    ? dashboard?.branchDistribution.filter((b) => b.code === selectedBranch)
+  const filteredBranchData = selectedBranches.length > 0
+    ? dashboard?.branchDistribution.filter((b) => selectedBranches.includes(b.code))
     : dashboard?.branchDistribution || [];
+
+  // Prepare options for MultiSelect
+  const periodOptions = periods?.map((p) => ({
+    value: p.period,
+    label: formatPeriod(p.period),
+  })) || [];
+
+  const branchOptions = branches?.map((b) => ({
+    value: b.code,
+    label: `${b.code} - ${b.name}`,
+  })) || [];
+
+  const companyOptions = companies?.map((c) => ({
+    value: c.id.toString(),
+    label: c.name,
+  })) || [];
 
   return (
     <div className="space-y-6">
@@ -73,96 +84,36 @@ export function Dashboard() {
           <CardContent className="p-6">
             <div className="grid gap-4 md:grid-cols-3">
               {/* Period Filter */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Dönem</label>
-                <select
-                  value={selectedPeriod}
-                  onChange={(e) => setSelectedPeriod(e.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {periods?.map((period) => (
-                    <option key={period.period} value={period.period}>
-                      {formatPeriod(period.period)}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <MultiSelect
+                label="Dönem"
+                options={periodOptions}
+                selected={selectedPeriods}
+                onChange={setSelectedPeriods}
+                placeholder="Dönem seçin..."
+                allLabel="Tüm Dönemler"
+                showAllOption={false}
+              />
 
               {/* Branch Filter */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Hazine Kodu</label>
-                <select
-                  value={selectedBranch}
-                  onChange={(e) => setSelectedBranch(e.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <option value="">Tüm Branşlar</option>
-                  {branches?.map((branch) => (
-                    <option key={branch.code} value={branch.code}>
-                      {branch.code}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <MultiSelect
+                label="Hazine Kodu"
+                options={branchOptions}
+                selected={selectedBranches}
+                onChange={setSelectedBranches}
+                placeholder="Tüm Branşlar"
+                allLabel="Tüm Branşlar"
+              />
 
               {/* Company Filter */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Şirketler (Çoklu Seçim)</label>
-                <button
-                  onClick={() => setShowCompanySelector(!showCompanySelector)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-left hover:bg-accent"
-                >
-                  {selectedCompanies.length > 0
-                    ? `${selectedCompanies.length} şirket seçili`
-                    : 'Şirket seçin...'}
-                </button>
-              </div>
+              <MultiSelect
+                label="Şirketler"
+                options={companyOptions}
+                selected={selectedCompanyIds}
+                onChange={setSelectedCompanyIds}
+                placeholder="Tüm Şirketler"
+                allLabel="Tüm Şirketler"
+              />
             </div>
-
-            {/* Selected Companies */}
-            {selectedCompanies.length > 0 && (
-              <div className="mt-4">
-                <div className="flex flex-wrap gap-2">
-                  {selectedCompanies.map((companyId) => {
-                    const company = companies?.find((c) => c.id === companyId);
-                    return (
-                      <div
-                        key={companyId}
-                        className="inline-flex items-center space-x-2 rounded-md bg-primary/10 px-3 py-1.5 text-sm"
-                      >
-                        <span>{company?.name}</span>
-                        <button
-                          onClick={() => removeCompany(companyId)}
-                          className="text-primary hover:text-primary/70"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Company Selector */}
-            {showCompanySelector && (
-              <div className="mt-4 max-h-64 overflow-y-auto border rounded-md p-4 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-                {companies?.map((company) => (
-                  <label
-                    key={company.id}
-                    className="flex items-center space-x-2 cursor-pointer hover:bg-accent p-2 rounded"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedCompanies.includes(company.id)}
-                      onChange={() => toggleCompany(company.id)}
-                      className="h-4 w-4 rounded border-gray-300"
-                    />
-                    <span className="text-sm">{company.name}</span>
-                  </label>
-                ))}
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>
@@ -216,7 +167,7 @@ export function Dashboard() {
                   fontSize={12}
                 />
                 <Tooltip
-                  formatter={(value: any) => formatCurrency(value as number)}
+                  formatter={(value) => formatCurrency(value as number)}
                   labelFormatter={(label) => `Hazine Kodu: ${label}`}
                 />
                 <Bar dataKey="total_premium" fill="#3b82f6" />
@@ -242,7 +193,7 @@ export function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="code" fontSize={12} />
                 <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} fontSize={12} />
-                <Tooltip formatter={(value: any) => `${(value as number).toFixed(2)}%`} />
+                <Tooltip formatter={(value) => `${(value as number).toFixed(2)}%`} />
                 <Bar dataKey="loss_ratio" fill="#ef4444" />
               </BarChart>
             </ResponsiveContainer>
@@ -254,7 +205,7 @@ export function Dashboard() {
       <Card>
         <CardHeader>
           <CardTitle>Detaylı Branş Analizi</CardTitle>
-          <CardDescription>{formatPeriod(selectedPeriod)}</CardDescription>
+          <CardDescription>{formatPeriod(effectivePeriod)}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">

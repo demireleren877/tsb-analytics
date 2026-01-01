@@ -239,16 +239,16 @@ comparisons.get('/yoy', async (c) => {
         },
         growth: {
           net_premium: parseFloat(calculateGrowth(
-            (current?.net_premium as number) || 0,
-            (previous?.net_premium as number) || 0
+            current?.net_premium || 0,
+            previous?.net_premium || 0
           ).toFixed(2)),
           net_payment: parseFloat(calculateGrowth(
-            (current?.net_payment as number) || 0,
-            (previous?.net_payment as number) || 0
+            current?.net_payment || 0,
+            previous?.net_payment || 0
           ).toFixed(2)),
           net_earned_premium: parseFloat(calculateGrowth(
-            (current?.net_earned_premium as number) || 0,
-            (previous?.net_earned_premium as number) || 0
+            current?.net_earned_premium || 0,
+            previous?.net_earned_premium || 0
           ).toFixed(2)),
         },
       },
@@ -328,20 +328,20 @@ comparisons.get('/qoq', async (c) => {
         },
         growth: {
           net_premium: parseFloat(calculateGrowth(
-            (current?.net_premium as number) || 0,
-            (previous?.net_premium as number) || 0
+            current?.net_premium || 0,
+            previous?.net_premium || 0
           ).toFixed(2)),
           net_payment: parseFloat(calculateGrowth(
-            (current?.net_payment as number) || 0,
-            (previous?.net_payment as number) || 0
+            current?.net_payment || 0,
+            previous?.net_payment || 0
           ).toFixed(2)),
           net_earned_premium: parseFloat(calculateGrowth(
-            (current?.net_earned_premium as number) || 0,
-            (previous?.net_earned_premium as number) || 0
+            current?.net_earned_premium || 0,
+            previous?.net_earned_premium || 0
           ).toFixed(2)),
           net_incurred: parseFloat(calculateGrowth(
-            (current?.net_incurred as number) || 0,
-            (previous?.net_incurred as number) || 0
+            current?.net_incurred || 0,
+            previous?.net_incurred || 0
           ).toFixed(2)),
         },
       },
