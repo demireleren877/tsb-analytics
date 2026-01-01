@@ -76,17 +76,21 @@ export function Compare() {
     );
   };
 
-  // Create period-based chart data (periods on X-axis, companies as bars)
-  const periodChartData = comparisonByPeriod?.map((periodData, periodIndex) => {
-    const periodObj: any = {
-      period: formatPeriod(effectivePeriods[periodIndex]),
+  // Create company-based chart data (companies on X-axis, periods as bars)
+  const companyDiscountChartData = comparison?.map((company) => {
+    const companyObj: any = {
+      name: company.name.substring(0, 15),
+      fullName: company.name,
     };
 
-    periodData?.forEach((company) => {
-      periodObj[company.name.substring(0, 15)] = company.totals.discount_rate;
+    // Add discount rate for each selected period
+    comparisonByPeriod?.forEach((periodData, periodIndex) => {
+      const companyInPeriod = periodData?.find((c) => c.id === company.id);
+      const periodLabel = formatPeriod(effectivePeriods[periodIndex]);
+      companyObj[periodLabel] = companyInPeriod?.totals.discount_rate || 0;
     });
 
-    return periodObj;
+    return companyObj;
   }) || [];
 
   const chartData = comparison?.map((company) => {
@@ -114,12 +118,8 @@ export function Compare() {
     };
   });
 
-  // Market share calculation
+  // Market share calculation (used in table)
   const totalMarketPremium = comparison?.reduce((sum, c) => sum + c.totals.net_premium, 0) || 1;
-  const marketShareData = comparison?.map((company) => ({
-    name: company.name.substring(0, 20),
-    market_share: (company.totals.net_premium / totalMarketPremium) * 100,
-  }));
 
   // Performance radar chart data
   const radarData = comparison?.map((company) => {
@@ -412,48 +412,36 @@ export function Compare() {
                 </CardContent>
               </Card>
 
-              {/* Loss Ratio Comparison */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Loss Ratio Karşılaştırması</CardTitle>
-                  <CardDescription>Hasar prim oranları analizi</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} fontSize={11} />
-                      <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
-                      <Tooltip formatter={(value: any) => formatPercent(value as number)} />
-                      <Bar dataKey="loss_ratio" fill="#f59e0b" name="Loss Ratio (%)" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              {/* Discount Rate Comparison - Period Based */}
-              {periodChartData.length > 0 && (
+              {/* Discount Rate Comparison - Company Based with Period Bars */}
+              {companyDiscountChartData.length > 0 && effectivePeriods.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <CardTitle>İskonto Oranı Karşılaştırması (Dönem Bazlı)</CardTitle>
-                    <CardDescription>Seçili dönemler ve şirketler için iskonto oranları</CardDescription>
+                    <CardTitle>İskonto Oranı Karşılaştırması</CardTitle>
+                    <CardDescription>Şirketler bazında dönemsel iskonto oranları karşılaştırması</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={350}>
-                      <BarChart data={periodChartData}>
+                      <BarChart data={companyDiscountChartData}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="period" angle={-45} textAnchor="end" height={80} fontSize={11} />
+                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} fontSize={11} />
                         <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
-                        <Tooltip formatter={(value: any) => `${(value as number).toFixed(2)}%`} />
+                        <Tooltip
+                          formatter={(value: any) => `${(value as number).toFixed(2)}%`}
+                          labelFormatter={(label) => {
+                            const company = companyDiscountChartData.find((c) => c.name === label);
+                            return company?.fullName || label;
+                          }}
+                        />
                         <Legend />
-                        {comparison?.map((company, idx) => {
+                        {effectivePeriods.map((period, idx) => {
                           const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16'];
+                          const periodLabel = formatPeriod(period);
                           return (
                             <Bar
-                              key={company.id}
-                              dataKey={company.name.substring(0, 15)}
+                              key={period}
+                              dataKey={periodLabel}
                               fill={colors[idx % colors.length]}
-                              name={company.name}
+                              name={periodLabel}
                             />
                           );
                         })}
@@ -462,25 +450,6 @@ export function Compare() {
                   </CardContent>
                 </Card>
               )}
-
-              {/* Market Share */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Pazar Payı Dağılımı</CardTitle>
-                  <CardDescription>Seçili şirketler arasında pazar payı</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={marketShareData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} fontSize={11} />
-                      <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
-                      <Tooltip formatter={(value: any) => `${(value as number).toFixed(2)}%`} />
-                      <Bar dataKey="market_share" fill="#8b5cf6" name="Pazar Payı (%)" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
 
               {/* Performance Radar Chart */}
               {radarData && radarData.length <= 6 && (
