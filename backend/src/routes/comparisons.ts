@@ -52,9 +52,14 @@ comparisons.post('/companies', async (c) => {
     `;
     const params = [...companyIds, currentPeriod];
 
+    // Support multiple branches (comma-separated)
     if (branch) {
-      query += ' AND fd.branch_code = ?';
-      params.push(branch);
+      const branches = branch.split(',').filter(b => b.trim());
+      if (branches.length > 0) {
+        const branchPlaceholders = branches.map(() => '?').join(',');
+        query += ` AND fd.branch_code IN (${branchPlaceholders})`;
+        params.push(...branches);
+      }
     }
 
     query += ' GROUP BY c.id, c.name, c.code, fd.branch_code, bc.name';
@@ -76,9 +81,14 @@ comparisons.post('/companies', async (c) => {
     `;
     const pyeParams = [...companyIds, pyePeriod];
 
+    // Support multiple branches (comma-separated)
     if (branch) {
-      pyeQuery += ' AND fd.branch_code = ?';
-      pyeParams.push(branch);
+      const branches = branch.split(',').filter(b => b.trim());
+      if (branches.length > 0) {
+        const branchPlaceholders = branches.map(() => '?').join(',');
+        pyeQuery += ` AND fd.branch_code IN (${branchPlaceholders})`;
+        pyeParams.push(...branches);
+      }
     }
 
     pyeQuery += ' GROUP BY c.id, fd.branch_code';

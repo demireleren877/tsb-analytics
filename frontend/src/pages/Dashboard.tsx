@@ -39,14 +39,14 @@ export function Dashboard() {
 
   // Use first selected period for API call (API currently supports single period)
   const effectivePeriod = selectedPeriods[0] || '20253';
-  // Use first selected branch or empty for all
-  const effectiveBranch = selectedBranches.length > 0 ? selectedBranches[0] : undefined;
+  // Use all selected branches (or undefined for all)
+  const effectiveBranches = selectedBranches.length > 0 ? selectedBranches : undefined;
   // Convert string IDs to numbers
   const effectiveCompanyIds = selectedCompanyIds.map((id) => parseInt(id));
 
   const { data: dashboard, isLoading } = useQuery({
-    queryKey: ['dashboard', effectivePeriod, effectiveBranch, effectiveCompanyIds],
-    queryFn: () => getDashboard(effectivePeriod, effectiveBranch, effectiveCompanyIds.length > 0 ? effectiveCompanyIds : undefined),
+    queryKey: ['dashboard', effectivePeriod, effectiveBranches, effectiveCompanyIds],
+    queryFn: () => getDashboard(effectivePeriod, effectiveBranches, effectiveCompanyIds.length > 0 ? effectiveCompanyIds : undefined),
   });
 
   if (isLoading) return <Loading />;

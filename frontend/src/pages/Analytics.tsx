@@ -36,17 +36,17 @@ export function Analytics() {
 
   // Use first selected period for API call
   const effectivePeriod = selectedPeriods[0] || '20253';
-  const effectiveBranch = selectedBranches.length > 0 ? selectedBranches[0] : undefined;
+  const effectiveBranches = selectedBranches.length > 0 ? selectedBranches : undefined;
 
   const { data: dashboard } = useQuery({
-    queryKey: ['dashboard', effectivePeriod, effectiveBranch],
-    queryFn: () => getDashboard(effectivePeriod, effectiveBranch),
+    queryKey: ['dashboard', effectivePeriod, effectiveBranches],
+    queryFn: () => getDashboard(effectivePeriod, effectiveBranches),
   });
 
   const { data: rankings, isLoading } = useQuery({
-    queryKey: ['rankings', 'net_premium', effectivePeriod, effectiveBranch],
+    queryKey: ['rankings', 'net_premium', effectivePeriod, effectiveBranches],
     queryFn: () =>
-      getRankings('net_premium', effectivePeriod, effectiveBranch, 20),
+      getRankings('net_premium', effectivePeriod, effectiveBranches, 20),
   });
 
   // Prepare options for MultiSelect

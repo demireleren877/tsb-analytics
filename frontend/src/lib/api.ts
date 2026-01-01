@@ -49,12 +49,18 @@ export const getPeriods = async (): Promise<Period[]> => {
 };
 
 // Analytics
-export const getDashboard = async (period?: string, branch?: string, companyIds?: number[]): Promise<DashboardData> => {
+export const getDashboard = async (period?: string, branch?: string | string[], companyIds?: number[]): Promise<DashboardData> => {
   const params = new URLSearchParams();
   if (period) params.append('period', period);
-  if (branch) params.append('branch', branch);
+
+  // Support both single string and array of branches
+  if (branch) {
+    const branchValue = Array.isArray(branch) ? branch.join(',') : branch;
+    if (branchValue) params.append('branch', branchValue);
+  }
+
   if (companyIds && companyIds.length > 0) {
-    companyIds.forEach(id => params.append('companies', id.toString()));
+    params.append('company_ids', companyIds.join(','));
   }
 
   const queryString = params.toString();
@@ -65,14 +71,19 @@ export const getDashboard = async (period?: string, branch?: string, companyIds?
 export const getRankings = async (
   metric: string = 'net_premium',
   period?: string,
-  branch?: string,
+  branch?: string | string[],
   limit: number = 10
 ): Promise<CompanyRanking[]> => {
   const params = new URLSearchParams();
   params.append('metric', metric);
   params.append('limit', limit.toString());
   if (period) params.append('period', period);
-  if (branch) params.append('branch', branch);
+
+  // Support both single string and array of branches
+  if (branch) {
+    const branchValue = Array.isArray(branch) ? branch.join(',') : branch;
+    if (branchValue) params.append('branch', branchValue);
+  }
 
   const response = await api.get(`/api/analytics/rankings?${params.toString()}`);
   return response.data.data;
@@ -80,13 +91,18 @@ export const getRankings = async (
 
 export const getLossRatioRankings = async (
   period?: string,
-  branch?: string,
+  branch?: string | string[],
   limit: number = 20
 ): Promise<any[]> => {
   const params = new URLSearchParams();
   params.append('limit', limit.toString());
   if (period) params.append('period', period);
-  if (branch) params.append('branch', branch);
+
+  // Support both single string and array of branches
+  if (branch) {
+    const branchValue = Array.isArray(branch) ? branch.join(',') : branch;
+    if (branchValue) params.append('branch', branchValue);
+  }
 
   const response = await api.get(`/api/analytics/loss-ratio-rankings?${params.toString()}`);
   return response.data.data;
@@ -96,13 +112,18 @@ export const getTrends = async (
   company: number,
   metric: string = 'net_premium',
   periods: number = 8,
-  branch?: string
+  branch?: string | string[]
 ): Promise<TrendData[]> => {
   const params = new URLSearchParams();
   params.append('company', company.toString());
   params.append('metric', metric);
   params.append('periods', periods.toString());
-  if (branch) params.append('branch', branch);
+
+  // Support both single string and array of branches
+  if (branch) {
+    const branchValue = Array.isArray(branch) ? branch.join(',') : branch;
+    if (branchValue) params.append('branch', branchValue);
+  }
 
   const response = await api.get(`/api/analytics/trends?${params.toString()}`);
   return response.data.data;
@@ -111,12 +132,17 @@ export const getTrends = async (
 export const getGrowth = async (
   company: number,
   metric: string = 'net_premium',
-  branch?: string
+  branch?: string | string[]
 ): Promise<GrowthData> => {
   const params = new URLSearchParams();
   params.append('company', company.toString());
   params.append('metric', metric);
-  if (branch) params.append('branch', branch);
+
+  // Support both single string and array of branches
+  if (branch) {
+    const branchValue = Array.isArray(branch) ? branch.join(',') : branch;
+    if (branchValue) params.append('branch', branchValue);
+  }
 
   const response = await api.get(`/api/analytics/growth?${params.toString()}`);
   return response.data.data;
@@ -125,12 +151,17 @@ export const getGrowth = async (
 export const getCompanyPerformance = async (
   company: number,
   periods: number = 8,
-  branch?: string
+  branch?: string | string[]
 ): Promise<CompanyPerformanceData[]> => {
   const params = new URLSearchParams();
   params.append('company', company.toString());
   params.append('periods', periods.toString());
-  if (branch) params.append('branch', branch);
+
+  // Support both single string and array of branches
+  if (branch) {
+    const branchValue = Array.isArray(branch) ? branch.join(',') : branch;
+    if (branchValue) params.append('branch', branchValue);
+  }
 
   const response = await api.get(`/api/analytics/company-performance?${params.toString()}`);
   return response.data.data;
@@ -140,12 +171,17 @@ export const getCompanyPerformance = async (
 export const compareCompanies = async (
   companyIds: number[],
   period?: string,
-  branch?: string
+  branch?: string | string[]
 ): Promise<ComparisonData[]> => {
+  // Support both single string and array of branches
+  const branchValue = branch
+    ? (Array.isArray(branch) ? branch.join(',') : branch)
+    : undefined;
+
   const response = await api.post('/api/comparisons/companies', {
     companyIds,
     period,
-    branch,
+    branch: branchValue,
   });
   return response.data.data;
 };

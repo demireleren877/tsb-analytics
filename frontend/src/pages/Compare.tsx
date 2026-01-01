@@ -49,15 +49,15 @@ export function Compare() {
   // Convert string IDs to numbers
   const selectedCompanies = selectedCompanyIds.map((id) => parseInt(id));
   const effectivePeriods = selectedPeriods.length > 0 ? selectedPeriods : [selectedPeriod];
-  const effectiveBranch = selectedBranches.length > 0 ? selectedBranches[0] : undefined;
+  const effectiveBranches = selectedBranches.length > 0 ? selectedBranches : undefined;
 
   // Fetch data for all selected periods
   const { data: comparisonByPeriod, isLoading } = useQuery({
-    queryKey: ['comparison-multi-period', selectedCompanies, effectivePeriods, effectiveBranch],
+    queryKey: ['comparison-multi-period', selectedCompanies, effectivePeriods, effectiveBranches],
     queryFn: async () => {
       const results = await Promise.all(
         effectivePeriods.map((period) =>
-          compareCompanies(selectedCompanies, period, effectiveBranch)
+          compareCompanies(selectedCompanies, period, effectiveBranches)
         )
       );
       return results;

@@ -9,16 +9,31 @@ const analytics = new Hono<{ Bindings: Bindings }>();
 // GET /api/analytics/dashboard - Dashboard metrikleri
 analytics.get('/dashboard', async (c) => {
   try {
-    const { period, branch } = c.req.query();
+    const { period, branch, company_ids } = c.req.query();
     const currentPeriod = period || '20253'; // Default to latest period
 
     // Build WHERE clause for branch filtering
     let whereClause = 'WHERE period = ?';
     const baseParams: any[] = [currentPeriod];
 
+    // Support multiple branches (comma-separated)
     if (branch) {
-      whereClause += ' AND branch_code = ?';
-      baseParams.push(branch);
+      const branches = branch.split(',').filter(b => b.trim());
+      if (branches.length > 0) {
+        const placeholders = branches.map(() => '?').join(',');
+        whereClause += ` AND branch_code IN (${placeholders})`;
+        baseParams.push(...branches);
+      }
+    }
+
+    // Support multiple companies (comma-separated)
+    if (company_ids) {
+      const companyIds = company_ids.split(',').filter(c => c.trim());
+      if (companyIds.length > 0) {
+        const placeholders = companyIds.map(() => '?').join(',');
+        whereClause += ` AND company_id IN (${placeholders})`;
+        baseParams.push(...companyIds);
+      }
     }
 
     // Toplam prim üretimi
@@ -153,9 +168,14 @@ analytics.get('/rankings', async (c) => {
     `;
     const params: any[] = [currentPeriod];
 
+    // Support multiple branches (comma-separated)
     if (branch) {
-      query += ' AND fd.branch_code = ?';
-      params.push(branch);
+      const branches = branch.split(',').filter(b => b.trim());
+      if (branches.length > 0) {
+        const placeholders = branches.map(() => '?').join(',');
+        query += ` AND fd.branch_code IN (${placeholders})`;
+        params.push(...branches);
+      }
     }
 
     query += ` GROUP BY c.id, c.name, c.code`;
@@ -217,9 +237,14 @@ analytics.get('/growth', async (c) => {
     `;
     const currentParams: any[] = [company, currentPeriod];
 
+    // Support multiple branches (comma-separated)
     if (branch) {
-      currentQuery += ' AND branch_code = ?';
-      currentParams.push(branch);
+      const branches = branch.split(',').filter(b => b.trim());
+      if (branches.length > 0) {
+        const placeholders = branches.map(() => '?').join(',');
+        currentQuery += ` AND branch_code IN (${placeholders})`;
+        currentParams.push(...branches);
+      }
     }
 
     const currentQoQ = await c.env.DB.prepare(currentQuery).bind(...currentParams).first();
@@ -231,9 +256,14 @@ analytics.get('/growth', async (c) => {
     `;
     const previousParams: any[] = [company, previousQuarter];
 
+    // Support multiple branches (comma-separated)
     if (branch) {
-      previousQuery += ' AND branch_code = ?';
-      previousParams.push(branch);
+      const branches = branch.split(',').filter(b => b.trim());
+      if (branches.length > 0) {
+        const placeholders = branches.map(() => '?').join(',');
+        previousQuery += ` AND branch_code IN (${placeholders})`;
+        previousParams.push(...branches);
+      }
     }
 
     const previousQoQ = await c.env.DB.prepare(previousQuery).bind(...previousParams).first();
@@ -282,9 +312,14 @@ analytics.get('/company-performance', async (c) => {
     `;
     const periodsParams: any[] = [company];
 
+    // Support multiple branches (comma-separated)
     if (branch) {
-      periodsQuery += ' AND branch_code = ?';
-      periodsParams.push(branch);
+      const branches = branch.split(',').filter(b => b.trim());
+      if (branches.length > 0) {
+        const placeholders = branches.map(() => '?').join(',');
+        periodsQuery += ` AND branch_code IN (${placeholders})`;
+        periodsParams.push(...branches);
+      }
     }
 
     periodsQuery += ' ORDER BY period DESC LIMIT ?';
@@ -323,9 +358,14 @@ analytics.get('/company-performance', async (c) => {
       `;
       const currentParams: any[] = [company, currentPeriod];
 
+      // Support multiple branches (comma-separated)
       if (branch) {
-        currentQuery += ' AND branch_code = ?';
-        currentParams.push(branch);
+        const branches = branch.split(',').filter(b => b.trim());
+        if (branches.length > 0) {
+          const placeholders = branches.map(() => '?').join(',');
+          currentQuery += ` AND branch_code IN (${placeholders})`;
+          currentParams.push(...branches);
+        }
       }
 
       const currentData = await c.env.DB.prepare(currentQuery).bind(...currentParams).first();
@@ -340,9 +380,14 @@ analytics.get('/company-performance', async (c) => {
       `;
       const pyeParams: any[] = [company, pyePeriod];
 
+      // Support multiple branches (comma-separated)
       if (branch) {
-        pyeQuery += ' AND branch_code = ?';
-        pyeParams.push(branch);
+        const branches = branch.split(',').filter(b => b.trim());
+        if (branches.length > 0) {
+          const placeholders = branches.map(() => '?').join(',');
+          pyeQuery += ` AND branch_code IN (${placeholders})`;
+          pyeParams.push(...branches);
+        }
       }
 
       const pyeData = await c.env.DB.prepare(pyeQuery).bind(...pyeParams).first();
@@ -404,9 +449,14 @@ analytics.get('/loss-ratio-rankings', async (c) => {
     `;
     const params: any[] = [currentPeriod];
 
+    // Support multiple branches (comma-separated)
     if (branch) {
-      query += ' AND fd.branch_code = ?';
-      params.push(branch);
+      const branches = branch.split(',').filter(b => b.trim());
+      if (branches.length > 0) {
+        const placeholders = branches.map(() => '?').join(',');
+        query += ` AND fd.branch_code IN (${placeholders})`;
+        params.push(...branches);
+      }
     }
 
     query += ' GROUP BY c.id, c.name, c.code';
@@ -424,9 +474,14 @@ analytics.get('/loss-ratio-rankings', async (c) => {
     `;
     const pyeParams: any[] = [pyePeriod];
 
+    // Support multiple branches (comma-separated)
     if (branch) {
-      pyeQuery += ' AND fd.branch_code = ?';
-      pyeParams.push(branch);
+      const branches = branch.split(',').filter(b => b.trim());
+      if (branches.length > 0) {
+        const placeholders = branches.map(() => '?').join(',');
+        pyeQuery += ` AND fd.branch_code IN (${placeholders})`;
+        pyeParams.push(...branches);
+      }
     }
 
     pyeQuery += ' GROUP BY c.id';

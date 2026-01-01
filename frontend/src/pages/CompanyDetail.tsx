@@ -37,19 +37,19 @@ export function CompanyDetail() {
     queryFn: getBranches,
   });
 
-  // Get effective branch (first selected or undefined for all)
-  const effectiveBranch = selectedBranches.length > 0 ? selectedBranches[0] : undefined;
+  // Get all selected branches (or undefined for all)
+  const effectiveBranches = selectedBranches.length > 0 ? selectedBranches : undefined;
 
   // Get performance data with PYE
   const { data: performanceData } = useQuery({
-    queryKey: ['performance', companyId, effectiveBranch],
-    queryFn: () => getCompanyPerformance(companyId, 8, effectiveBranch),
+    queryKey: ['performance', companyId, effectiveBranches],
+    queryFn: () => getCompanyPerformance(companyId, 8, effectiveBranches),
     enabled: !!companyId,
   });
 
   const { data: growth } = useQuery({
-    queryKey: ['growth', companyId, effectiveBranch],
-    queryFn: () => getGrowth(companyId, 'net_premium', effectiveBranch),
+    queryKey: ['growth', companyId, effectiveBranches],
+    queryFn: () => getGrowth(companyId, 'net_premium', effectiveBranches),
     enabled: !!companyId,
   });
 
