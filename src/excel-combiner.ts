@@ -22,6 +22,7 @@ interface CombinedRow {
   'Raporlanmayan Muallak Tazminat'?: number;
   'Tahakkuk Eden Muallak Tazminat Reasürör Payı'?: number;
   'Raporlanmayan Muallak Tazminat Reasürör Payı'?: number;
+  'Nakit Akışlarından Kaynaklanan İskonto'?: number;
   // Net hesaplamalar
   'Net Prim'?: number;
   'Net KPK'?: number;
@@ -155,6 +156,7 @@ export class ExcelCombiner {
       // Muallak tazminat sütunlarını row array'inden direkt al
       // Position 111: Tahakkuk Eden (Muallak Tazminat Karşılığı)
       // Position 117: Raporlanmayan (Muallak Tazminat Karşılığı)
+      // Position 119: Nakit Akışlarından Kaynaklanan İskonto
       // Position 123: Tahakkuk Eden (Muallak Tazminatlar Karşılığında Reasürör Payı)
       // Position 129: Raporlanmayan (Muallak Tazminatlar Karşılığında Reasürör Payı)
       if (row[111] !== undefined && row[111] !== '') {
@@ -162,6 +164,9 @@ export class ExcelCombiner {
       }
       if (row[117] !== undefined && row[117] !== '') {
         (filteredRow as any)['Raporlanmayan Muallak Tazminat'] = row[117];
+      }
+      if (row[119] !== undefined && row[119] !== '') {
+        (filteredRow as any)['Nakit Akışlarından Kaynaklanan İskonto'] = row[119];
       }
       if (row[123] !== undefined && row[123] !== '') {
         (filteredRow as any)['Tahakkuk Eden Muallak Tazminat Reasürör Payı'] = row[123];

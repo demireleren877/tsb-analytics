@@ -1,0 +1,16 @@
+name = "tsb-analytics-frontend"
+type = "javascript"
+main = "dist/index.html"
+compatibility_date = "2024-12-01"
+
+[build]
+command = "npm run build"
+cwd = "/Users/erendemirel/Desktop/development/projects/tsb_scrap/frontend"
+watch_paths = ["src/**/*.{ts,tsx,css}"]
+
+[build.upload]
+format = "service-worker"
+
+[env.production]
+name = "tsb-analytics-frontend-production"
+route = "example.com/*"

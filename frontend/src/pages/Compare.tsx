@@ -18,7 +18,7 @@ import {
   Radar,
   ComposedChart,
 } from 'recharts';
-import { GitCompare, Plus, X, TrendingUp } from 'lucide-react';
+import { GitCompare, X, TrendingUp } from 'lucide-react';
 import { getCompanies, compareCompanies, getPeriods, getBranches } from '../lib/api';
 import { formatCurrency, formatPercent, formatPeriod } from '../lib/utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/Card';
@@ -26,9 +26,10 @@ import { Loading } from '../components/Loading';
 import { useStore } from '../store/useStore';
 
 export function Compare() {
-  const { selectedPeriod, setSelectedPeriod } = useStore();
+  const { selectedPeriod } = useStore();
   const [selectedCompanies, setSelectedCompanies] = useState<number[]>([]);
-  const [showSelector, setShowSelector] = useState(false);
+  const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
+  const [showCompanySelector, setShowCompanySelector] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState('');
 
   const { data: companies } = useQuery({
@@ -46,9 +47,11 @@ export function Compare() {
     queryFn: getBranches,
   });
 
+  const effectivePeriod = selectedPeriods.length > 0 ? selectedPeriods[0] : selectedPeriod;
+
   const { data: comparison, isLoading } = useQuery({
-    queryKey: ['comparison', selectedCompanies, selectedPeriod, selectedBranch],
-    queryFn: () => compareCompanies(selectedCompanies, selectedPeriod, selectedBranch || undefined),
+    queryKey: ['comparison', selectedCompanies, effectivePeriod, selectedBranch],
+    queryFn: () => compareCompanies(selectedCompanies, effectivePeriod, selectedBranch || undefined),
     enabled: selectedCompanies.length >= 2,
   });
 
@@ -83,6 +86,7 @@ export function Compare() {
       net_earned_premium: company.totals.net_earned_premium,
       net_ultimate: netUltimate,
       loss_ratio: lossRatio,
+      discount_rate: company.totals.discount_rate,
     };
   });
 
@@ -125,18 +129,36 @@ export function Compare() {
         <CardContent className="p-6">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Dönem</label>
-              <select
-                value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
+              <label className="text-sm font-medium">Dönem (Çoklu Seçim)</label>
+              <div className="border rounded-md max-h-40 overflow-y-auto p-2 bg-background">
                 {periods?.map((period) => (
-                  <option key={period.period} value={period.period}>
-                    {formatPeriod(period.period)}
-                  </option>
+                  <label
+                    key={period.period}
+                    className="flex items-center space-x-2 cursor-pointer hover:bg-accent p-2 rounded"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedPeriods.includes(period.period)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedPeriods((prev) => [...prev, period.period]);
+                        } else {
+                          setSelectedPeriods((prev) =>
+                            prev.filter((p) => p !== period.period)
+                          );
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <span className="text-sm">{formatPeriod(period.period)}</span>
+                  </label>
                 ))}
-              </select>
+              </div>
+              {selectedPeriods.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedPeriods.length} dönem seçili
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -157,35 +179,47 @@ export function Compare() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Şirketler (Karşılaştırma için)</label>
-              <button
-                onClick={() => setShowSelector(!showSelector)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-left hover:bg-accent"
-              >
-                {selectedCompanies.length > 0
-                  ? `${selectedCompanies.length} şirket seçili`
-                  : 'Şirket seçin...'}
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowCompanySelector(!showCompanySelector)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-left hover:bg-accent flex items-center justify-between"
+                >
+                  <span>
+                    {selectedCompanies.length > 0
+                      ? `${selectedCompanies.length} şirket seçili`
+                      : 'Şirket seçin...'}
+                  </span>
+                  <span className="text-xs">▼</span>
+                </button>
+                {showCompanySelector && (
+                  <div className="absolute z-50 w-full mt-1 border rounded-md bg-background shadow-lg max-h-48 overflow-y-auto">
+                    {companies?.map((company) => (
+                      <label
+                        key={company.id}
+                        className="flex items-center space-x-2 cursor-pointer hover:bg-accent p-2 border-b last:border-b-0"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedCompanies.includes(company.id)}
+                          onChange={() => toggleCompany(company.id)}
+                          disabled={!selectedCompanies.includes(company.id) && selectedCompanies.length >= 10}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <span className="text-sm flex-1">{company.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Company Selector */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Seçili Şirketler ({selectedCompanies.length}/10)</h3>
-              <button
-                onClick={() => setShowSelector(!showSelector)}
-                className="inline-flex items-center space-x-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Şirket Ekle</span>
-              </button>
-            </div>
-
-            {/* Selected Companies */}
+      {/* Selected Companies Display */}
+      {selectedCompanies.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
             <div className="flex flex-wrap gap-2">
               {selectedCompanies.map((companyId) => {
                 const company = companies?.find((c) => c.id === companyId);
@@ -204,36 +238,10 @@ export function Compare() {
                   </div>
                 );
               })}
-              {selectedCompanies.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Karşılaştırma için en az 2 şirket seçin
-                </p>
-              )}
             </div>
-
-            {/* Company List */}
-            {showSelector && (
-              <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3 max-h-64 overflow-y-auto border rounded-md p-4">
-                {companies?.map((company) => (
-                  <label
-                    key={company.id}
-                    className="flex items-center space-x-2 cursor-pointer hover:bg-accent p-2 rounded"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedCompanies.includes(company.id)}
-                      onChange={() => toggleCompany(company.id)}
-                      disabled={!selectedCompanies.includes(company.id) && selectedCompanies.length >= 10}
-                      className="h-4 w-4 rounded border-gray-300"
-                    />
-                    <span className="text-sm">{company.name}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Comparison Results */}
       {selectedCompanies.length >= 2 && (
@@ -399,6 +407,25 @@ export function Compare() {
                 </CardContent>
               </Card>
 
+              {/* Discount Rate Comparison */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>İskonto Oranı Karşılaştırması</CardTitle>
+                  <CardDescription>Nakit akışlarından kaynaklanan iskonto oranları</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} fontSize={11} />
+                      <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
+                      <Tooltip formatter={(value: any) => `${(value as number).toFixed(2)}%`} />
+                      <Bar dataKey="discount_rate" fill="#3b82f6" name="İskonto Oranı (%)" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
               {/* Market Share */}
               <Card>
                 <CardHeader>
@@ -461,6 +488,7 @@ export function Compare() {
                           <th className="text-right p-3">Muallak</th>
                           <th className="text-right p-3">Kazanılmış Prim</th>
                           <th className="text-right p-3">Loss Ratio</th>
+                          <th className="text-right p-3">İskonto Oranı</th>
                           <th className="text-right p-3">Pazar Payı</th>
                         </tr>
                       </thead>
@@ -508,6 +536,19 @@ export function Compare() {
                                   }`}
                                 >
                                   {lossRatio.toFixed(2)}%
+                                </span>
+                              </td>
+                              <td className="text-right p-3">
+                                <span
+                                  className={`font-semibold ${
+                                    company.totals.discount_rate > 15
+                                      ? 'text-green-600'
+                                      : company.totals.discount_rate > 10
+                                      ? 'text-blue-600'
+                                      : 'text-yellow-600'
+                                  }`}
+                                >
+                                  {company.totals.discount_rate.toFixed(2)}%
                                 </span>
                               </td>
                               <td className="text-right p-3 font-mono">

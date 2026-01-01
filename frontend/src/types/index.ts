@@ -89,6 +89,10 @@ export interface ComparisonData {
     net_unreported: number;
     pye_net_incurred: number;
     pye_net_unreported: number;
+    discount_provision: number;
+    gross_incurred: number;
+    gross_unreported: number;
+    discount_rate: number;
   }[];
   totals: {
     gross_premium: number;
@@ -99,6 +103,10 @@ export interface ComparisonData {
     net_unreported: number;
     pye_net_incurred: number;
     pye_net_unreported: number;
+    discount_provision: number;
+    gross_incurred: number;
+    gross_unreported: number;
+    discount_rate: number;
   };
 }
 

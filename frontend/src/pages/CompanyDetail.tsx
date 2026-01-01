@@ -72,6 +72,7 @@ export function CompanyDetail() {
       net_earned_premium: netEP,
       net_ultimate: netUltimate,
       loss_ratio: lossRatio,
+      discount_rate: (item as any).discount_rate || 0,
     };
   });
 
@@ -227,6 +228,33 @@ export function CompanyDetail() {
                 dot={{ r: 5, fill: '#ef4444' }}
               />
             </ComposedChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Discount Rate Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>İskonto Oranları</CardTitle>
+          <CardDescription>Nakit akışlarından kaynaklanan iskonto oranı - Son 8 çeyrek</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={quarterlyData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="period" />
+              <YAxis tickFormatter={(value) => `${value.toFixed(1)}%`} />
+              <Tooltip formatter={(value: any) => `${(value as number).toFixed(2)}%`} />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="discount_rate"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                name="İskonto Oranı"
+                dot={{ r: 4 }}
+              />
+            </LineChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>

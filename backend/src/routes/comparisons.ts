@@ -40,7 +40,10 @@ comparisons.post('/companies', async (c) => {
         SUM(fd.net_payment) as net_payment,
         SUM(fd.net_earned_premium) as net_earned_premium,
         SUM(fd.net_incurred) as net_incurred,
-        SUM(fd.net_unreported) as net_unreported
+        SUM(fd.net_unreported) as net_unreported,
+        SUM(fd.discount_provision) as discount_provision,
+        SUM(fd.incurred_claims) as gross_incurred,
+        SUM(fd.unreported_claims) as gross_unreported
       FROM financial_data fd
       JOIN companies c ON fd.company_id = c.id
       JOIN branch_codes bc ON fd.branch_code = bc.code
@@ -110,12 +113,21 @@ comparisons.post('/companies', async (c) => {
             net_unreported: 0,
             pye_net_incurred: 0,
             pye_net_unreported: 0,
+            discount_provision: 0,
+            gross_incurred: 0,
+            gross_unreported: 0,
           },
         };
       }
 
       const pyeKey = `${row.id}_${row.branch_code}`;
       const pye = pyeData[pyeKey] || { pye_net_incurred: 0, pye_net_unreported: 0 };
+
+      // Calculate discount rate for this branch
+      const grossTotal = Math.abs(row.gross_incurred || 0) + Math.abs(row.gross_unreported || 0);
+      const discountRate = grossTotal > 0
+        ? (Math.abs(row.discount_provision || 0) / grossTotal) * 100
+        : 0;
 
       companyData[row.id].branches.push({
         code: row.branch_code,
@@ -128,6 +140,10 @@ comparisons.post('/companies', async (c) => {
         net_unreported: row.net_unreported,
         pye_net_incurred: pye.pye_net_incurred,
         pye_net_unreported: pye.pye_net_unreported,
+        discount_provision: row.discount_provision,
+        gross_incurred: row.gross_incurred,
+        gross_unreported: row.gross_unreported,
+        discount_rate: parseFloat(discountRate.toFixed(2)),
       });
 
       // Add to totals
@@ -139,6 +155,17 @@ comparisons.post('/companies', async (c) => {
       companyData[row.id].totals.net_unreported += row.net_unreported || 0;
       companyData[row.id].totals.pye_net_incurred += pye.pye_net_incurred || 0;
       companyData[row.id].totals.pye_net_unreported += pye.pye_net_unreported || 0;
+      companyData[row.id].totals.discount_provision += row.discount_provision || 0;
+      companyData[row.id].totals.gross_incurred += row.gross_incurred || 0;
+      companyData[row.id].totals.gross_unreported += row.gross_unreported || 0;
+    });
+
+    // Calculate total discount rate for each company
+    Object.values(companyData).forEach((company: any) => {
+      const totalGross = Math.abs(company.totals.gross_incurred) + Math.abs(company.totals.gross_unreported);
+      company.totals.discount_rate = totalGross > 0
+        ? parseFloat(((Math.abs(company.totals.discount_provision) / totalGross) * 100).toFixed(2))
+        : 0;
     });
 
     return c.json({

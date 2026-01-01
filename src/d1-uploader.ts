@@ -26,6 +26,7 @@ interface D1UploadRow {
   unreported_claims: number;
   reinsurer_share_incurred: number;
   reinsurer_share_unreported: number;
+  discount_provision: number;
 
   // Net hesaplamalar
   net_premium: number;
@@ -94,6 +95,7 @@ export class D1Uploader {
       unreported_claims: this.parseNumber(row['Raporlanmayan Muallak Tazminat']),
       reinsurer_share_incurred: this.parseNumber(row['Tahakkuk Eden Muallak Tazminat Reasürör Payı']),
       reinsurer_share_unreported: this.parseNumber(row['Raporlanmayan Muallak Tazminat Reasürör Payı']),
+      discount_provision: this.parseNumber(row['Nakit Akışlarından Kaynaklanan İskonto']),
 
       // Net hesaplamalar
       net_premium: this.parseNumber(row['Net Prim']),
@@ -192,6 +194,7 @@ export class D1Uploader {
         gross_paid_claims, reinsurer_share_paid_claims,
         incurred_claims, unreported_claims,
         reinsurer_share_incurred, reinsurer_share_unreported,
+        discount_provision,
         net_premium, net_unearned_reserve, net_payment,
         net_unreported, net_incurred, net_earned_premium,
         pye_net_payment, pye_net_unreported, pye_net_incurred, pye_net_earned_premium,
@@ -212,6 +215,7 @@ export class D1Uploader {
           ${row.gross_paid_claims}, ${row.reinsurer_share_paid_claims},
           ${row.incurred_claims}, ${row.unreported_claims},
           ${row.reinsurer_share_incurred}, ${row.reinsurer_share_unreported},
+          ${row.discount_provision},
           ${row.net_premium}, ${row.net_unearned_reserve}, ${row.net_payment},
           ${row.net_unreported}, ${row.net_incurred}, ${row.net_earned_premium},
           ${row.pye_net_payment ?? 'NULL'}, ${row.pye_net_unreported ?? 'NULL'}, ${row.pye_net_incurred ?? 'NULL'}, ${row.pye_net_earned_premium ?? 'NULL'},
