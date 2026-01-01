@@ -15,6 +15,7 @@ import { formatCurrency, formatPercent, formatPeriod } from '../lib/utils';
 import { MetricCard } from '../components/MetricCard';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/Card';
 import { Loading } from '../components/Loading';
+import { SubscriptionCard } from '../components/SubscriptionCard';
 
 export function Dashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState('20253');
@@ -306,6 +307,9 @@ export function Dashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Subscription Card */}
+      <SubscriptionCard />
     </div>
   );
 }

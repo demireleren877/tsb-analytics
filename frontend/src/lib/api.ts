@@ -161,3 +161,48 @@ export const getYoY = async (
   const response = await api.get(`/api/comparisons/yoy?${params.toString()}`);
   return response.data.data;
 };
+
+// Subscriptions
+export interface SubscriptionResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
+export interface SubscriptionStatus {
+  subscribed: boolean;
+  subscribedAt?: string;
+}
+
+export interface SubscriptionStats {
+  activeSubscribers: number;
+}
+
+export interface LatestCheckInfo {
+  latestPeriod: string | null;
+  lastCheck: {
+    time: string;
+    period: string;
+    newDataFound: boolean;
+  } | null;
+}
+
+export const subscribe = async (email: string): Promise<SubscriptionResponse> => {
+  const response = await api.post('/api/subscriptions/subscribe', { email });
+  return response.data;
+};
+
+export const checkSubscriptionStatus = async (email: string): Promise<SubscriptionStatus> => {
+  const response = await api.get(`/api/subscriptions/status/${encodeURIComponent(email)}`);
+  return response.data;
+};
+
+export const getSubscriptionStats = async (): Promise<SubscriptionStats> => {
+  const response = await api.get('/api/subscriptions/stats');
+  return response.data;
+};
+
+export const getLatestCheck = async (): Promise<LatestCheckInfo> => {
+  const response = await api.get('/api/subscriptions/latest-check');
+  return response.data;
+};

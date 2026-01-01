@@ -13,6 +13,11 @@ database_id = "6e3867a0-1f95-467d-8417-3a431a464871"
 ALLOWED_ORIGINS = "*"
 API_VERSION = "v1"
 
+# Scheduled triggers for data checking
+# Runs every day at 09:00 and 18:00 (UTC)
+[triggers]
+crons = ["0 9 * * *", "0 18 * * *"]
+
 # Production environment
 [env.production]
 name = "tsb-analytics-api-production"

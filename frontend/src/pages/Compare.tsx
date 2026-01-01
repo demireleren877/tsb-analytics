@@ -30,6 +30,7 @@ export function Compare() {
   const [selectedCompanies, setSelectedCompanies] = useState<number[]>([]);
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
   const [showCompanySelector, setShowCompanySelector] = useState(false);
+  const [showPeriodSelector, setShowPeriodSelector] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState('');
 
   const { data: companies } = useQuery({
@@ -154,35 +155,45 @@ export function Compare() {
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <label className="text-sm font-medium">Dönem (Çoklu Seçim)</label>
-              <div className="border rounded-md max-h-40 overflow-y-auto p-2 bg-background">
-                {periods?.map((period) => (
-                  <label
-                    key={period.period}
-                    className="flex items-center space-x-2 cursor-pointer hover:bg-accent p-2 rounded"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedPeriods.includes(period.period)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedPeriods((prev) => [...prev, period.period]);
-                        } else {
-                          setSelectedPeriods((prev) =>
-                            prev.filter((p) => p !== period.period)
-                          );
-                        }
-                      }}
-                      className="h-4 w-4 rounded border-gray-300"
-                    />
-                    <span className="text-sm">{formatPeriod(period.period)}</span>
-                  </label>
-                ))}
+              <div className="relative">
+                <button
+                  onClick={() => setShowPeriodSelector(!showPeriodSelector)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-left hover:bg-accent flex items-center justify-between"
+                >
+                  <span>
+                    {selectedPeriods.length > 0
+                      ? `${selectedPeriods.length} dönem seçili`
+                      : 'Dönem seçin...'}
+                  </span>
+                  <span className="text-xs">▼</span>
+                </button>
+                {showPeriodSelector && (
+                  <div className="absolute z-50 w-full mt-1 border rounded-md bg-background shadow-lg max-h-48 overflow-y-auto">
+                    {periods?.map((period) => (
+                      <label
+                        key={period.period}
+                        className="flex items-center space-x-2 cursor-pointer hover:bg-accent p-2 border-b last:border-b-0"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedPeriods.includes(period.period)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedPeriods((prev) => [...prev, period.period]);
+                            } else {
+                              setSelectedPeriods((prev) =>
+                                prev.filter((p) => p !== period.period)
+                              );
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <span className="text-sm flex-1">{formatPeriod(period.period)}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
-              {selectedPeriods.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  {selectedPeriods.length} dönem seçili
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -240,29 +251,55 @@ export function Compare() {
         </CardContent>
       </Card>
 
-      {/* Selected Companies Display */}
-      {selectedCompanies.length > 0 && (
+      {/* Selected Items Display */}
+      {(selectedCompanies.length > 0 || selectedPeriods.length > 0) && (
         <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-wrap gap-2">
-              {selectedCompanies.map((companyId) => {
-                const company = companies?.find((c) => c.id === companyId);
-                return (
-                  <div
-                    key={companyId}
-                    className="inline-flex items-center space-x-2 rounded-md bg-primary/10 px-3 py-1.5 text-sm"
-                  >
-                    <span>{company?.name}</span>
-                    <button
-                      onClick={() => toggleCompany(companyId)}
-                      className="text-primary hover:text-primary/70"
+          <CardContent className="p-4 space-y-3">
+            {selectedPeriods.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Seçili Dönemler:</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedPeriods.map((period) => (
+                    <div
+                      key={period}
+                      className="inline-flex items-center space-x-2 rounded-md bg-blue-100 dark:bg-blue-900/30 px-3 py-1.5 text-sm"
                     >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+                      <span>{formatPeriod(period)}</span>
+                      <button
+                        onClick={() => setSelectedPeriods((prev) => prev.filter((p) => p !== period))}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {selectedCompanies.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Seçili Şirketler:</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedCompanies.map((companyId) => {
+                    const company = companies?.find((c) => c.id === companyId);
+                    return (
+                      <div
+                        key={companyId}
+                        className="inline-flex items-center space-x-2 rounded-md bg-primary/10 px-3 py-1.5 text-sm"
+                      >
+                        <span>{company?.name}</span>
+                        <button
+                          onClick={() => toggleCompany(companyId)}
+                          className="text-primary hover:text-primary/70"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
