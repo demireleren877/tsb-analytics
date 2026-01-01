@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { BarChart3, Building2, GitCompare, BookOpen } from 'lucide-react';
+import { BarChart3, Building2, GitCompare, BookOpen, Bell } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -8,6 +8,7 @@ const navigation = [
   { name: 'Karşılaştırma', href: '/compare', icon: GitCompare },
   { name: 'Analizler', href: '/analytics', icon: BarChart3 },
   { name: 'Veri Sözlüğü', href: '/dictionary', icon: BookOpen },
+  { name: 'Abonelik', href: '/subscription', icon: Bell },
 ];
 
 export function Layout() {

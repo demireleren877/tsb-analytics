@@ -7,6 +7,7 @@ import { CompanyDetail } from './pages/CompanyDetail';
 import { Compare } from './pages/Compare';
 import { Analytics } from './pages/Analytics';
 import { DataDictionary } from './pages/DataDictionary';
+import { Subscription } from './pages/Subscription';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,6 +31,7 @@ function App() {
               <Route path="compare" element={<Compare />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="dictionary" element={<DataDictionary />} />
+              <Route path="subscription" element={<Subscription />} />
             </Route>
           </Routes>
         </BrowserRouter>
