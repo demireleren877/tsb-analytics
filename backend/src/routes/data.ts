@@ -93,10 +93,10 @@ data.get('/', async (c) => {
       success: true,
       data: result.results,
       pagination: {
-        total: countResult?.total || 0,
+        total: (countResult?.total as number) || 0,
         limit: parseInt(limit),
         offset: parseInt(offset),
-        hasMore: (parseInt(offset) + parseInt(limit)) < (countResult?.total || 0),
+        hasMore: (parseInt(offset) + parseInt(limit)) < ((countResult?.total as number) || 0),
       },
     });
   } catch (error: any) {
